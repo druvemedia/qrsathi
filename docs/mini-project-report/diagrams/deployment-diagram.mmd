@@ -1,0 +1,30 @@
+%% Figure 4.26: Deployment diagram: verified development set-up and recommended production topology
+flowchart LR
+  subgraph DEV["Development workstation (verified)"]
+    D1["Node.js 22 + npm 10"]
+    D2["next dev :3000"]
+    D3[("prisma/dev.db<br/>SQLite file")]
+    D4["./uploads"]
+    D1 --> D2 --> D3
+    D2 --> D4
+  end
+  subgraph CI["GitHub Actions CI (defined in .github/workflows/ci.yml)"]
+    C1["quality job: typecheck, lint,<br/>unit, build, API/admin/browser tests"]
+    C2["mysql job: MySQL 8.4 service<br/>migrations + data migration test"]
+  end
+  subgraph PROD["Production (RECOMMENDED - not verified as deployed)"]
+    RP["Reverse proxy<br/>nginx / Caddy, TLS"]
+    APP1["next start<br/>(process manager)"]
+    APP2["next start<br/>(optional 2nd instance)"]
+    MY[("MySQL 8<br/>least-privilege user")]
+    VOL["Persistent volume<br/>UPLOAD_DIR"]
+    RP --> APP1
+    RP -.-> APP2
+    APP1 --> MY
+    APP2 -.-> MY
+    APP1 --> VOL
+  end
+  EXT["Razorpay, Google OAuth, SMTP"]
+  INTERNET(("Internet users")) --> RP
+  APP1 -.-> EXT
+  EXT -.->|webhook| RP

@@ -7,30 +7,31 @@ import { toast } from "sonner";
 import { api } from "@/lib/fetcher";
 import { safeNextPath } from "@/lib/safe-redirect";
 import { Logo } from "@/components/brand";
+import { footerLine } from "@/lib/branding";
 import { useApp } from "@/components/providers";
 import { ThemeToggle } from "@/components/user-menu";
 import { Alert, Button, Field, Input } from "@/components/ui";
 
 export function AuthAside() {
   const { settings } = useApp();
+  const b = settings.branding;
   return (
-    <aside className="relative hidden overflow-hidden border-r border-slate-800 bg-slate-950 p-12 text-white lg:flex lg:flex-col">
-      <div className="absolute -right-24 -top-24 h-96 w-96 rounded-full bg-brand/20 blur-3xl" />
-      <div className="relative [&_a]:text-white"><Logo /></div>
-      <div className="relative mt-auto max-w-md">
-        <h2 className="font-display text-4xl font-extrabold leading-tight">QR codes that work as hard as you do.</h2>
-        <p className="mt-3 text-white/80">{settings.tagline}.</p>
-        <ul className="mt-8 space-y-3 text-sm">
+    <aside className="relative hidden flex-col justify-between border-r border-zinc-800 bg-[#0b0b0d] p-12 text-zinc-100 lg:flex">
+      <div className="[&_a]:text-white"><Logo /></div>
+      <div className="max-w-md">
+        <p className="font-serif text-4xl leading-[1.15] tracking-tight">Codes for the counter, the shelf and the campaign.</p>
+        <ul className="mt-10 space-y-4 text-sm text-zinc-300">
           {[
-            [IndianRupee, "UPI payment QR & printable standees"],
-            [RefreshCw, "Dynamic QR — change links without reprinting"],
-            [BarChart3, "Privacy-respecting scan analytics"],
-            [ShieldCheck, "No PINs, OTPs or bank passwords — ever"],
+            [IndianRupee, "UPI payment QR with printable standees"],
+            [RefreshCw, "Dynamic QR — change the link without reprinting"],
+            [BarChart3, "Scan analytics without storing IP addresses"],
+            [ShieldCheck, "We never ask for UPI PINs, OTPs or bank passwords"],
           ].map(([Icon, t]: any) => (
-            <li key={t} className="flex items-center gap-3"><span className="grid h-8 w-8 place-items-center rounded-lg bg-white/15"><Icon className="h-4 w-4" /></span>{t}</li>
+            <li key={t} className="flex items-center gap-3"><Icon className="h-4 w-4 shrink-0 text-zinc-500" aria-hidden />{t}</li>
           ))}
         </ul>
       </div>
+      <p className="text-xs text-zinc-500">{footerLine(b)}</p>
     </aside>
   );
 }
@@ -39,7 +40,7 @@ function Header({ title, subtitle }: { title: string; subtitle: React.ReactNode 
   return (
     <div className="mb-8">
       <div className="mb-8 flex items-center justify-between lg:hidden"><Logo /><ThemeToggle /></div>
-      <h1 className="font-display text-3xl font-extrabold tracking-tight">{title}</h1>
+      <h1 className="font-serif text-3xl tracking-tight">{title}</h1>
       <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">{subtitle}</p>
     </div>
   );
@@ -61,7 +62,7 @@ function GoogleButton({ enabled, next }: { enabled: boolean; next: string }) {
   if (!enabled) return null;
   return (
     <>
-      <a href={`/api/auth/google?next=${encodeURIComponent(next)}`} className="flex h-11 w-full items-center justify-center gap-3 rounded-xl border border-slate-200 bg-white text-sm font-semibold transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800">
+      <a href={`/api/auth/google?next=${encodeURIComponent(next)}`} className="flex h-11 w-full items-center justify-center gap-3 rounded-lg border border-zinc-300 bg-white text-sm font-medium transition-[background-color,transform] hover:bg-zinc-50 active:scale-[0.99] dark:border-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800">
         <svg viewBox="0 0 24 24" className="h-5 w-5" aria-hidden><path fill="#EA4335" d="M12 10.2v3.9h5.5c-.2 1.3-1.6 3.8-5.5 3.8-3.3 0-6-2.7-6-6.1s2.7-6.1 6-6.1c1.9 0 3.1.8 3.8 1.5l2.6-2.5C16.8 3.2 14.6 2.2 12 2.2 6.6 2.2 2.2 6.6 2.2 12s4.4 9.8 9.8 9.8c5.7 0 9.4-4 9.4-9.6 0-.6-.1-1.1-.2-1.6H12z" /></svg>
         Continue with Google
       </a>

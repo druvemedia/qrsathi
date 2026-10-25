@@ -15,7 +15,7 @@ import { trackDownload } from "@/components/qr/export-panel";
 import { useApp } from "@/components/providers";
 
 interface Usage { saved: number; dynamic: number; hosted: number; downloads: number }
-interface PlanInfo { name: string; dynamicLimit: number; hostedLimit: number; savedLimit: number }
+interface PlanInfo { name: string; limits: import("@/lib/plans").PlanLimits }
 
 export function Library() {
   const { user } = useApp();
@@ -78,9 +78,9 @@ export function Library() {
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         {usage ? (
           <>
-            <StatCard label="Saved QR codes" value={formatNumber(usage.usage.saved)} hint={`of ${formatNumber(usage.plan.savedLimit)} on ${usage.plan.name}`} />
-            <StatCard label="Dynamic QR" value={`${usage.usage.dynamic}/${usage.plan.dynamicLimit}`} hint="Editable short links" />
-            <StatCard label="Hosted pages" value={`${usage.usage.hosted}/${usage.plan.hostedLimit}`} hint="Menus, link-in-bio, coupons…" />
+            <StatCard label="Saved QR codes" value={formatNumber(usage.usage.saved)} hint={`of ${formatNumber(usage.plan.limits.savedQr)} on ${usage.plan.name}`} />
+            <StatCard label="Dynamic QR" value={`${usage.usage.dynamic}/${usage.plan.limits.dynamic}`} hint="Editable short links" />
+            <StatCard label="Hosted pages" value={`${usage.usage.hosted}/${usage.plan.limits.hosted}`} hint="Menus, link-in-bio, coupons…" />
             <StatCard label="Total scans" value={formatNumber(totalScans)} hint={<Link className="text-brand" href="/analytics">View analytics →</Link>} />
           </>
         ) : Array.from({ length: 4 }, (_, i) => <Skeleton key={i} className="h-[118px]" />)}
@@ -193,7 +193,7 @@ function QrCard({ qr, onFavorite, onRename, onDuplicate, onDelete, onDownload }:
               <MoreHorizontal className="h-4 w-4" />
             </button>
             {menu && (
-              <div className="card absolute bottom-9 right-0 z-20 w-44 animate-scale-in p-1 shadow-xl">
+              <div className="card absolute bottom-9 right-0 z-20 w-44 origin-bottom-right animate-dropdown-in p-1 shadow-xl">
                 <MenuItem icon={Pencil} onClick={onRename}>Rename</MenuItem>
                 <MenuItem icon={CopyPlus} onClick={onDuplicate}>Duplicate</MenuItem>
                 {qr.shortCode && <MenuItem icon={Copy} onClick={() => { navigator.clipboard.writeText(qr.payload); toast.success("Link copied"); }}>Copy short link</MenuItem>}

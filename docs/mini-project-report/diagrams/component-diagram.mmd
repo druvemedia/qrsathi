@@ -1,0 +1,54 @@
+%% Figure 4.25: Component diagram
+flowchart LR
+  subgraph UI["Presentation components (src/components, src/app)"]
+    WB["QR Workbench<br/>qr/workbench, type-form,<br/>design-panel, export-panel"]
+    BG["Barcode generator<br/>barcode/*"]
+    SCN["Universal scanner<br/>scanner/scanner.tsx"]
+    PRD["Products & inventory views"]
+    ANA["Analytics views<br/>recharts"]
+    ADM["Admin console<br/>admin-shell, *-view.tsx"]
+    SHELL["App shell, command palette,<br/>providers (theme)"]
+  end
+  subgraph ISO["Isomorphic libraries"]
+    QT["qr-types.ts (27 types)"]
+    QRR["qr-render.ts"]
+    BAR["barcodes.ts (23 formats)"]
+    UPI["upi.ts, content-safety.ts"]
+    PLN["plans.ts, branding.ts"]
+  end
+  subgraph SRV["Server libraries (src/lib)"]
+    SES["session.ts, guard.ts, roles.ts"]
+    API["api.ts (handle, readJson)"]
+    QS["qr-service.ts, scans.ts"]
+    PS["products.ts"]
+    ENT["entitlements.ts, plan-store.ts"]
+    BIL["billing.ts, razorpay.ts,<br/>payment-config.ts"]
+    SECM["rate-limit, audit, redact,<br/>mfa, secret-box"]
+    STO["storage.ts, image-check.ts"]
+    DBM["db.ts (PrismaClient)"]
+  end
+  WB --> QT
+  WB --> QRR
+  BG --> BAR
+  SCN --> UPI
+  SCN --> BAR
+  ADM --> PLN
+  WB -->|fetch /api/qrcodes| API
+  PRD -->|fetch /api/products| API
+  ADM -->|fetch /api/admin/*| API
+  API --> SES
+  API --> QS
+  API --> PS
+  API --> BIL
+  QS --> QT
+  QS --> ENT
+  PS --> BAR
+  PS --> ENT
+  BIL --> ENT
+  SES --> DBM
+  QS --> DBM
+  PS --> DBM
+  BIL --> DBM
+  ENT --> DBM
+  API --> SECM
+  API --> STO

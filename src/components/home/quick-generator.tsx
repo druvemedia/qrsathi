@@ -20,7 +20,7 @@ import { DRAFT_KEY } from "@/components/qr/workbench";
 const QUICK = ["url", "upi", "whatsapp", "wifi", "text", "vcard"];
 const STYLES = ["classic", "scan-me", "pay-here", "aurora", "ocean", "forest"];
 
-export function QuickGenerator() {
+export function QuickGenerator({ bare = false }: { bare?: boolean }) {
   const router = useRouter();
   const { user } = useApp();
   const [typeId, setTypeId] = useState("url");
@@ -57,7 +57,7 @@ export function QuickGenerator() {
   };
 
   return (
-    <Card className="overflow-hidden shadow-pop">
+    <Card className={cn("overflow-hidden", bare ? "rounded-none border-0 bg-transparent shadow-none dark:bg-transparent" : "shadow-pop")}>
       <div className="flex gap-1 overflow-x-auto border-b border-slate-100 p-2 scrollbar-thin dark:border-slate-800" role="tablist">
         {QUICK.map((id) => {
           const t = getType(id);

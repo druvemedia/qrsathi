@@ -1,0 +1,100 @@
+%% Figure 4.19: Class diagram: domain entities and server-side service modules
+classDiagram
+  direction LR
+  class User {
+    <<entity>>
+    +id: string
+    +email: string
+    +role: string
+    +plan: string
+    +status: string
+    +sessionVersion: int
+  }
+  class QrCode {
+    <<entity>>
+    +type: string
+    +payload: string
+    +isDynamic: boolean
+    +shortCode: string?
+    +status: string
+  }
+  class Product {
+    <<entity>>
+    +sku: string
+    +stock: int
+    +lowStockAt: int
+  }
+  class Barcode {
+    <<entity>>
+    +format: string
+    +value: string
+    +lookupKey: string
+  }
+  class Subscription {
+    <<entity>>
+    +status: string
+    +currentPeriodEnd: Date?
+  }
+  class SessionModule {
+    <<module lib/session.ts>>
+    +createSession(user, kind, mfa)
+    +getUser() User?
+    +getAdmin()
+    +requireUser() User
+    +requireAdmin(opts) User
+    +requireRecentAdminAuth(opts)
+    +revokeAllSessions(userId)
+  }
+  class QrService {
+    <<module lib/qr-service.ts>>
+    +createQr(user, input, base)
+    +updateQr(user, qr, input, base)
+    +duplicateQr(user, qr, base)
+    +withUtm(destination, utm) string
+  }
+  class ProductsModule {
+    <<module lib/products.ts>>
+    +createProduct(user, raw)
+    +updateProduct(user, id, raw)
+    +moveStock(user, id, input)
+    +lookupProduct(userId, code)
+  }
+  class Entitlements {
+    <<module lib/entitlements.ts>>
+    +withQuota(userId, fn)
+    +assertQrQuota(tx, userId, plan, kind)
+    +assertProductQuota(tx, userId, plan)
+    +requireFeature(user, feature)
+  }
+  class Billing {
+    <<module lib/billing.ts>>
+    +startSubscription(user, planId, interval)
+    +confirmCheckout(user, input)
+    +handleRazorpayWebhook(raw, sig, id)
+    +cancelSubscriptionFor(userId, opts)
+  }
+  class RazorpayClient {
+    <<module lib/razorpay.ts>>
+    +createSubscription(creds, s)
+    +fetchPayment(creds, id)
+    +verifySubscriptionSignature()
+    +verifyWebhookSignature()
+  }
+  class BarcodesModule {
+    <<module lib/barcodes.ts>>
+    +validateBarcode(format, input)
+    +renderBarcodeSvg(format, value)
+    +lookupKey(format, value)
+  }
+  User "1" --> "*" QrCode : owns
+  User "1" --> "*" Product : owns
+  Product "1" --> "*" Barcode : has
+  User "1" --> "*" Subscription : has
+  QrService ..> Entitlements : uses
+  ProductsModule ..> Entitlements : uses
+  ProductsModule ..> BarcodesModule : validates with
+  Billing ..> RazorpayClient : calls
+  QrService ..> QrCode : persists
+  ProductsModule ..> Product : persists
+  Billing ..> Subscription : persists
+  SessionModule ..> User : loads

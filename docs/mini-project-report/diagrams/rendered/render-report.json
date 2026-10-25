@@ -1,0 +1,258 @@
+[
+  {
+    "file": "system-architecture.mmd",
+    "figure": "4.1",
+    "title": "High-level system architecture of QRSathi",
+    "ok": true,
+    "width": 1686,
+    "height": 768
+  },
+  {
+    "file": "use-case-diagram.mmd",
+    "figure": "4.2",
+    "title": "Use-case diagram (actors and principal use cases)",
+    "ok": true,
+    "width": 689,
+    "height": 1247
+  },
+  {
+    "file": "context-dfd.mmd",
+    "figure": "4.3",
+    "title": "Context-level data-flow diagram (Level 0)",
+    "ok": true,
+    "width": 827,
+    "height": 533
+  },
+  {
+    "file": "level-1-dfd.mmd",
+    "figure": "4.4",
+    "title": "Level-1 data-flow diagram",
+    "ok": true,
+    "width": 1452,
+    "height": 398
+  },
+  {
+    "file": "level-2-dfd-qr.mmd",
+    "figure": "4.5",
+    "title": "Level-2 DFD: QR code creation and dynamic resolution (processes 2.0 and 3.0)",
+    "ok": true,
+    "width": 609,
+    "height": 1788
+  },
+  {
+    "file": "registration-login-flowchart.mmd",
+    "figure": "4.6",
+    "title": "Flowchart: user registration and login",
+    "ok": true,
+    "width": 1322,
+    "height": 1500
+  },
+  {
+    "file": "admin-config-flowchart.mmd",
+    "figure": "4.13",
+    "title": "Flowchart: administrator configuration workflow",
+    "ok": true,
+    "width": 937,
+    "height": 1819
+  },
+  {
+    "file": "conceptual-model.mmd",
+    "figure": "4.14",
+    "title": "Conceptual data model (entity groups)",
+    "ok": true,
+    "width": 784,
+    "height": 1085
+  },
+  {
+    "file": "database-erd.mmd",
+    "figure": "4.15",
+    "title": "Entity-relationship overview (15 related models; 7 standalone models listed in Table 4.6)",
+    "ok": true,
+    "width": 2466,
+    "height": 466
+  },
+  {
+    "file": "erd-accounts-qr.mmd",
+    "figure": "4.16",
+    "title": "ERD detail: accounts, sessions, QR codes and analytics",
+    "ok": true,
+    "width": 2262,
+    "height": 1662
+  },
+  {
+    "file": "erd-inventory.mmd",
+    "figure": "4.17",
+    "title": "ERD detail: products, barcodes and inventory ledger",
+    "ok": true,
+    "width": 1162,
+    "height": 1250
+  },
+  {
+    "file": "erd-billing.mmd",
+    "figure": "4.18",
+    "title": "ERD detail: pricing plans, subscriptions and payments",
+    "ok": true,
+    "width": 1257,
+    "height": 1456
+  },
+  {
+    "file": "class-diagram.mmd",
+    "figure": "4.19",
+    "title": "Class diagram: domain entities and server-side service modules",
+    "ok": true,
+    "width": 1462,
+    "height": 1461
+  },
+  {
+    "file": "login-sequence.mmd",
+    "figure": "4.20",
+    "title": "Sequence diagram: workspace login and administrator MFA login",
+    "ok": true,
+    "width": 1270,
+    "height": 1379
+  },
+  {
+    "file": "qr-generation-sequence.mmd",
+    "figure": "4.21",
+    "title": "Sequence diagram: saving a dynamic QR code",
+    "ok": true,
+    "width": 1430,
+    "height": 1288
+  },
+  {
+    "file": "product-create-sequence.mmd",
+    "figure": "4.22",
+    "title": "Sequence diagram: database-backed product creation",
+    "ok": true,
+    "width": 1272,
+    "height": 1193
+  },
+  {
+    "file": "admin-config-sequence.mmd",
+    "figure": "4.23",
+    "title": "Sequence diagram: super administrator saves payment-gateway credentials",
+    "ok": true,
+    "width": 1450,
+    "height": 1061
+  },
+  {
+    "file": "payment-sequence.mmd",
+    "figure": "4.24",
+    "title": "Sequence diagram: subscription checkout, verification and webhook",
+    "ok": true,
+    "width": 1095,
+    "height": 1519
+  },
+  {
+    "file": "component-diagram.mmd",
+    "figure": "4.25",
+    "title": "Component diagram",
+    "ok": true,
+    "width": 1316,
+    "height": 1008
+  },
+  {
+    "file": "deployment-diagram.mmd",
+    "figure": "4.26",
+    "title": "Deployment diagram: verified development set-up and recommended production topology",
+    "ok": true,
+    "width": 1222,
+    "height": 720
+  },
+  {
+    "file": "authorization-flowchart-a.mmd",
+    "figure": "4.7(a)",
+    "title": "Flowchart: request authorization, part (a) — CSRF check and workspace guard",
+    "ok": true,
+    "width": 553,
+    "height": 1800
+  },
+  {
+    "file": "authorization-flowchart-b.mmd",
+    "figure": "4.7(b)",
+    "title": "Flowchart: request authorization, part (b) — administrator guard",
+    "ok": true,
+    "width": 703,
+    "height": 1382
+  },
+  {
+    "file": "qr-generation-flowchart-a.mmd",
+    "figure": "4.8(a)",
+    "title": "Flowchart: QR generation, part (a) — in the browser",
+    "ok": true,
+    "width": 465,
+    "height": 1050
+  },
+  {
+    "file": "qr-generation-flowchart-b.mmd",
+    "figure": "4.8(b)",
+    "title": "Flowchart: QR generation, part (b) — saving on the server",
+    "ok": true,
+    "width": 747,
+    "height": 1169
+  },
+  {
+    "file": "barcode-flowchart-a.mmd",
+    "figure": "4.9(a)",
+    "title": "Flowchart: barcode generation",
+    "ok": true,
+    "width": 421,
+    "height": 941
+  },
+  {
+    "file": "barcode-flowchart-b.mmd",
+    "figure": "4.9(b)",
+    "title": "Flowchart: barcode and QR scanning",
+    "ok": true,
+    "width": 498,
+    "height": 1327
+  },
+  {
+    "file": "product-inventory-flowchart-a.mmd",
+    "figure": "4.10(a)",
+    "title": "Flowchart: product creation",
+    "ok": true,
+    "width": 918,
+    "height": 1354
+  },
+  {
+    "file": "product-inventory-flowchart-b.mmd",
+    "figure": "4.10(b)",
+    "title": "Flowchart: stock movement",
+    "ok": true,
+    "width": 766,
+    "height": 1163
+  },
+  {
+    "file": "dynamic-qr-resolution-flowchart-a.mmd",
+    "figure": "4.11(a)",
+    "title": "Flowchart: dynamic QR resolution, part (a) — status checks",
+    "ok": true,
+    "width": 708,
+    "height": 1190
+  },
+  {
+    "file": "dynamic-qr-resolution-flowchart-b.mmd",
+    "figure": "4.11(b)",
+    "title": "Flowchart: dynamic QR resolution, part (b) — scan recording and redirect",
+    "ok": true,
+    "width": 575,
+    "height": 931
+  },
+  {
+    "file": "subscription-payment-flowchart-a.mmd",
+    "figure": "4.12(a)",
+    "title": "Flowchart: subscription checkout, part (a) — starting checkout",
+    "ok": true,
+    "width": 677,
+    "height": 1221
+  },
+  {
+    "file": "subscription-payment-flowchart-b.mmd",
+    "figure": "4.12(b)",
+    "title": "Flowchart: subscription checkout, part (b) — confirmation",
+    "ok": true,
+    "width": 608,
+    "height": 1175
+  }
+]

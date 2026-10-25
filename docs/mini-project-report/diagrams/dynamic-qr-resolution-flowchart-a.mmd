@@ -1,0 +1,15 @@
+%% Figure 4.11(a): Flowchart: dynamic QR resolution, part (a) — status checks
+flowchart TD
+  S([GET /r/code]) --> F{shortCode exists<br/>and isDynamic?}
+  F -- No --> N404[404 not found page]
+  F -- Yes --> H{isHosted?}
+  H -- Yes --> P[302 to /p/code]
+  H -- No --> D{Disabled or owner<br/>suspended?}
+  D -- Yes --> G410a[410 disabled]
+  D -- No --> PA{Paused?}
+  PA -- Yes --> G410b[410 paused]
+  PA -- No --> EX{Expired?}
+  EX -- Yes --> G410c[410 expired]
+  EX -- No --> DS{Destination set?}
+  DS -- No --> N404b[404 no destination]
+  DS -- Yes --> B([Continue in part b])

@@ -1,0 +1,18 @@
+%% Figure 4.7(a): Flowchart: request authorization, part (a) — CSRF check and workspace guard
+flowchart TD
+  S([Request arrives]) --> M{API path and method<br/>not GET/HEAD/OPTIONS?}
+  M -- No --> H
+  M -- Yes --> WH{Webhook path?}
+  WH -- Yes --> H
+  WH -- No --> OR{Origin in allowed<br/>origins?}
+  OR -- No --> F403[403 cross-site blocked]
+  OR -- Yes --> H[Route handler]
+  H --> K{Guard used}
+  K -- requireAdmin --> ADM([Continue in part b])
+  K -- requireUser --> T1{qs_session JWT valid<br/>and Session row exists?}
+  T1 -- No --> F401[401 sign in]
+  T1 -- Yes --> T2{User active and<br/>sessionVersion matches?}
+  T2 -- No --> F401
+  T2 -- Yes --> OWN{Resource owned<br/>by user?}
+  OWN -- No --> F404[404 not found]
+  OWN -- Yes --> OK([Execute business logic])

@@ -1,0 +1,14 @@
+%% Figure 4.8(b): Flowchart: QR generation, part (b) — saving on the server
+flowchart TD
+  S([Save requested]) --> AU{Signed in?}
+  AU -- No --> LG[Redirect to login] --> E([End])
+  AU -- Yes --> POST[POST /api/qrcodes]
+  POST --> SV{Server validation OK?}
+  SV -- No --> E400[400 error shown] --> E
+  SV -- Yes --> DY{Dynamic or hosted?}
+  DY -- Yes --> SC[Allocate short code or alias<br/>payload = base/r or /p/code]
+  DY -- No --> PL[payload = encoded content]
+  SC --> Q{Within plan quota?<br/>withQuota transaction}
+  PL --> Q
+  Q -- No --> E403[403 plan limit] --> E
+  Q -- Yes --> INS[Insert QrCode row] --> OK([201 Created])

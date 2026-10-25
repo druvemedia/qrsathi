@@ -1,0 +1,21 @@
+@startuml
+' PlantUML equivalent of Figure 4.20 (workspace login).
+actor User
+participant Browser
+participant "middleware.ts" as MW
+participant "/api/auth/login" as L
+participant "auth-flow.ts" as AF
+database DB
+User -> Browser : e-mail + password
+Browser -> MW : POST with Origin
+MW -> L : origin allowed
+L -> AF : verifyCredentials()
+AF -> DB : find user
+alt invalid
+  AF -> DB : AuditLog login_failed
+  L --> Browser : 401 generic error
+else valid
+  L -> DB : create Session(kind=user)
+  L --> Browser : 200 + qs_session cookie
+end
+@enduml

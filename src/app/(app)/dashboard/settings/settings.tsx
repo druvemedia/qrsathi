@@ -2,9 +2,10 @@
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
-import { CreditCard, FileText, KeyRound, Monitor, Moon, Palette, Shield, SlidersHorizontal, Sun, Trash2, User } from "lucide-react";
+import { CreditCard, Receipt, FileText, KeyRound, Monitor, Moon, Palette, Shield, SlidersHorizontal, Sun, Trash2, User } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "@/lib/fetcher";
+import { BillingSection } from "./billing";
 import { isAdminRole } from "@/lib/roles";
 import { formatDate, formatNumber, cn } from "@/lib/utils";
 import { QR_TYPES } from "@/lib/qr-types";
@@ -16,7 +17,7 @@ import { useApp, type ThemePref } from "@/components/providers";
 
 interface Upload { id: string; filename: string; size: number; mime: string; createdAt: string; url: string }
 interface Account {
-  plan: { name: string; dynamicLimit: number; hostedLimit: number; savedLimit: number; productLimit?: number; bulkRows: number; analyticsDays: number };
+  plan: { name: string; limits: import("@/lib/plans").PlanLimits };
   usage: { saved: number; dynamic: number; hosted: number; downloads: number };
 }
 
@@ -26,6 +27,7 @@ const SECTIONS = [
   { id: "defaults", label: "Defaults", icon: SlidersHorizontal },
   { id: "security", label: "Account & security", icon: KeyRound },
   { id: "plan", label: "Plan & usage", icon: CreditCard },
+  { id: "billing", label: "Billing", icon: Receipt },
   { id: "files", label: "Uploaded files", icon: FileText },
   { id: "danger", label: "Delete account", icon: Trash2 },
 ];
@@ -156,14 +158,16 @@ export function AccountSettings() {
           </div>
           {!account ? <Skeleton className="h-28" /> : (
             <div className="grid gap-4 sm:grid-cols-2">
-              <Meter label="Saved QR codes" used={account.usage.saved} limit={account.plan.savedLimit} />
-              <Meter label="Dynamic QR codes" used={account.usage.dynamic} limit={account.plan.dynamicLimit} />
-              <Meter label="Hosted pages" used={account.usage.hosted} limit={account.plan.hostedLimit} />
-              {account.plan.productLimit !== undefined && products !== null && <Meter label="Products" used={products} limit={account.plan.productLimit} />}
+              <Meter label="Saved QR codes" used={account.usage.saved} limit={account.plan.limits.savedQr} />
+              <Meter label="Dynamic QR codes" used={account.usage.dynamic} limit={account.plan.limits.dynamic} />
+              <Meter label="Hosted pages" used={account.usage.hosted} limit={account.plan.limits.hosted} />
+              {products !== null && <Meter label="Products" used={products} limit={account.plan.limits.products} />}
             </div>
           )}
-          <p className="hint mt-4">Plans change only after the payment provider confirms payment. Bulk batches: up to {account ? formatNumber(account.plan.bulkRows) : "…"} rows · Analytics history: {account?.plan.analyticsDays ?? "…"} days.</p>
+          <p className="hint mt-4">Bulk batches: up to {account ? formatNumber(account.plan.limits.bulkRows) : "…"} rows · Analytics history: {account?.plan.limits.analyticsDays ?? "…"} days.</p>
         </Section>
+
+        <BillingSection />
 
         <Section id="files" title="Uploaded files" description="Files linked from your PDF/File QR codes." bodyClassName="p-0">
           {!uploads ? <div className="p-5"><Skeleton className="h-12" /></div> : uploads.length === 0 ? <p className="px-5 py-4 text-sm text-slate-500">No uploads yet. Upload PDFs or images from the PDF / File QR type.</p> : (

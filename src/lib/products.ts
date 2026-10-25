@@ -3,7 +3,8 @@ import { z } from "zod";
 import type { Prisma, User } from "@prisma/client";
 import { db } from "./db";
 import { ApiError } from "./api";
-import { getPlan } from "./plans";
+import { planForUser } from "./plan-store";
+import { assertBarcodeQuota, assertProductQuota, withQuota } from "./entitlements";
 import { BARCODE_MAP, PRODUCT_FORMATS, isRestrictedCirculation, lookupKey, renderBarcodeSvg, scanLookupKeys, validateBarcode } from "./barcodes";
 
 export const CURRENCIES = ["INR", "USD", "EUR", "GBP", "AED", "SGD"] as const;
@@ -121,10 +122,11 @@ export async function assertUnique(userId: string, sku: string, barcodes: { look
   }
 }
 
+/** Early, non-atomic check (e.g. before an import); creates re-check inside withQuota. */
 export async function checkProductLimit(user: User, adding = 1) {
-  const plan = getPlan(user.plan);
+  const plan = await planForUser(user);
   const n = await db.product.count({ where: { userId: user.id } });
-  if (n + adding > plan.productLimit) throw new ApiError(403, `Your ${plan.name} plan allows ${plan.productLimit.toLocaleString("en-IN")} products. Archive or delete some, or upgrade.`);
+  if (n + adding > plan.limits.products) throw new ApiError(403, `Your ${plan.name} plan allows ${plan.limits.products.toLocaleString("en-IN")} products. Archive or delete some, or upgrade your plan.`);
 }
 
 export async function createProduct(user: User, raw: unknown, txType: "created" | "imported" = "created") {
@@ -132,10 +134,13 @@ export async function createProduct(user: User, raw: unknown, txType: "created" 
   if (!r.success) throw new ApiError(400, r.error.issues[0]?.message || "Invalid product", r.error.issues);
   const p = r.data;
   const barcodes = normaliseBarcodes(p.barcodes);
-  await checkProductLimit(user);
   await assertUnique(user.id, p.sku, barcodes);
   const { barcodes: _b, price, ...fields } = p;
-  return db.product.create({
+  const plan = await planForUser(user);
+  return withQuota(user.id, async (tx) => {
+    await assertProductQuota(tx, user.id, plan, 1);
+    await assertBarcodeQuota(tx, user.id, plan, barcodes.length);
+    return tx.product.create({
     data: {
       ...fields,
       priceMinor: price,
@@ -144,6 +149,7 @@ export async function createProduct(user: User, raw: unknown, txType: "created" 
       transactions: { create: { userId: user.id, type: txType, quantity: p.stock, balance: p.stock, note: txType === "imported" ? "Imported" : "Product created" } },
     },
     include: { barcodes: true },
+    });
   });
 }
 
@@ -169,8 +175,11 @@ export async function updateProduct(user: User, id: string, raw: unknown) {
     data.status = status;
     notes.push(status === "archived" ? "archived" : "restored");
   }
-  return db.$transaction(async (tx) => {
+  const plan = barcodes ? await planForUser(user) : null;
+  return withQuota(user.id, async (tx) => {
     if (barcodes) {
+      const current = await tx.barcode.count({ where: { productId: id } });
+      await assertBarcodeQuota(tx, user.id, plan!, barcodes.length - current);
       await tx.barcode.deleteMany({ where: { productId: id } });
       await tx.barcode.createMany({ data: barcodes.map((b) => ({ ...b, userId: user.id, productId: id })) });
     }

@@ -92,7 +92,7 @@ function AccountMenu({ admin }: { admin: ConsoleAdmin }) {
         <span className="hidden max-w-[160px] truncate text-sm font-medium sm:block">{admin.email}</span>
       </button>
       {open && (
-        <div role="menu" className="card absolute right-0 top-11 z-50 w-64 animate-scale-in p-1.5 shadow-pop">
+        <div role="menu" className="card absolute right-0 top-11 z-50 w-64 origin-top-right animate-dropdown-in p-1.5 shadow-pop">
           <div className="px-3 py-2">
             <p className="truncate text-sm font-semibold">{admin.name || admin.email}</p>
             <p className="truncate text-xs text-slate-500">{admin.email}</p>

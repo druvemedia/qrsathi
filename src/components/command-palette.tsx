@@ -72,7 +72,7 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
   return createPortal(
     <div className="fixed inset-0 z-[80] flex items-start justify-center p-4 pt-[12vh]" role="dialog" aria-modal="true" aria-label="Quick actions">
       <div className="absolute inset-0 bg-slate-950/40 backdrop-blur-[2px]" onClick={onClose} />
-      <div className="relative w-full max-w-lg animate-scale-in overflow-hidden rounded-xl border border-slate-200 bg-white shadow-pop dark:border-slate-800 dark:bg-slate-900">
+      <div className="relative w-full max-w-lg animate-dialog-in overflow-hidden rounded-xl border border-slate-200 bg-white shadow-pop dark:border-slate-800 dark:bg-slate-900">
         <div className="flex items-center gap-2 border-b border-slate-100 px-3 dark:border-slate-800">
           <Search className="h-4 w-4 text-slate-400" aria-hidden />
           <input ref={input} value={q} onChange={(e) => setQ(e.target.value)} placeholder={user ? "Search pages, actions, products, QR codes…" : "Search pages and actions…"}

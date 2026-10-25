@@ -2,7 +2,7 @@ import { db } from "@/lib/db";
 import { handle, json } from "@/lib/api";
 import { requireAdmin } from "@/lib/session";
 import { fillDays } from "@/lib/admin-query";
-import { razorpayConfigured } from "@/lib/config";
+import { publicPaymentStatus } from "@/lib/payment-config";
 
 /** Platform KPIs for the admin overview — real database counts only. */
 export const GET = handle(async () => {
@@ -33,7 +33,7 @@ export const GET = handle(async () => {
     db.auditLog.count({ where: { action: { in: ["auth.login_failed", "admin.auth.login_failed", "admin.auth.mfa_failed"] }, createdAt: { gte: d1 } } }),
     db.auditLog.count({ where: { action: "admin.auth.login", createdAt: { gte: d7 } } }),
     db.user.groupBy({ by: ["plan"], _count: { _all: true } }),
-    db.payment.aggregate({ where: { status: "paid" }, _sum: { amount: true }, _count: { _all: true } }),
+    db.payment.aggregate({ where: { status: { in: ["paid", "partially_refunded", "refunded"] }, currency: "INR" }, _sum: { amount: true, refundedAmount: true }, _count: { _all: true } }),
     db.user.findMany({ where: { createdAt: { gte: d30 } }, select: { createdAt: true } }),
     db.qrCode.findMany({ where: { createdAt: { gte: d30 } }, select: { createdAt: true } }),
     db.auditLog.findMany({ where: { action: { startsWith: "admin." }, NOT: { action: { startsWith: "admin.auth.login_failed" } } }, orderBy: { createdAt: "desc" }, take: 8 }),
@@ -43,8 +43,8 @@ export const GET = handle(async () => {
     users, active, suspended, admins, new7, new30, qrs, dynamic, hosted, barcodes, products, scans, scans30, downloads,
     openReports, errors24h, failedLogins24h, adminLogins7d, adminsNoMfa,
     byPlan: byPlan.map((p) => ({ name: p.plan, value: p._count._all })),
-    billingConfigured: razorpayConfigured(),
-    revenuePaise: paid._sum.amount || 0,
+    billingConfigured: (await publicPaymentStatus()).checkoutReady,
+    revenuePaise: (paid._sum.amount || 0) - (paid._sum.refundedAmount || 0),
     paidCount: paid._count._all,
     signupsDaily: fillDays(30, signupDates.map((u) => u.createdAt)),
     qrDaily: fillDays(30, qrDates.map((q) => q.createdAt)),

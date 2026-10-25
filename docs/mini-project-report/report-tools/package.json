@@ -1,0 +1,20 @@
+{
+  "name": "qrsathi-report-build",
+  "private": true,
+  "type": "module",
+  "description": "Regenerates the QRSathi mini project report (DOCX, PDF, XLSX, Markdown) and diagrams.",
+  "scripts": {
+    "diagrams": "node render-diagrams.mjs",
+    "build": "node build.mjs"
+  },
+  "dependencies": {
+    "docx": "9.5.1",
+    "exceljs": "4.4.0",
+    "mammoth": "1.9.1",
+    "marked": "15.0.12",
+    "mermaid": "11.6.0",
+    "pdf-lib": "1.17.1",
+    "pdfjs-dist": "4.10.38",
+    "puppeteer-core": "24.10.0"
+  }
+}

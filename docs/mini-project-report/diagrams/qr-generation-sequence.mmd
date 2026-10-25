@@ -1,0 +1,35 @@
+%% Figure 4.21: Sequence diagram: saving a dynamic QR code
+sequenceDiagram
+  autonumber
+  actor U as User
+  participant W as Workbench (client)
+  participant R as qr-render.ts (client)
+  participant API as POST /api/qrcodes
+  participant S as lib/session.ts
+  participant Q as lib/qr-service.ts
+  participant E as lib/entitlements.ts
+  participant DB as Prisma + DB
+  U->>W: choose type, enter content, style
+  W->>R: renderQr(payload, design)
+  R-->>W: SVG preview
+  U->>W: Save (dynamic)
+  W->>API: JSON {name, type, content, design, dynamic, alias?}
+  API->>S: requireUser()
+  S->>DB: Session + User lookup
+  S-->>API: user (or 401)
+  API->>API: rateLimit 300/h, readJson(createSchema)
+  API->>Q: createQr(user, input, base)
+  Q->>Q: validateContent(type), decide dynamic/hosted
+  Q->>DB: check shortCode / alias uniqueness
+  Q->>E: withQuota(userId)
+  E->>DB: BEGIN tx, increment User.quotaLock (row lock)
+  E->>DB: COUNT QrCode by kind vs plan limits
+  alt over limit
+    E-->>API: ApiError 403
+    API-->>W: 403 plan limit message
+  else within limit
+    E->>DB: INSERT QrCode, COMMIT
+    Q-->>API: QrCode row
+    API->>DB: Log qr.created
+    API-->>W: 201 {item: payload = base/r/code}
+  end

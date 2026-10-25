@@ -5,7 +5,6 @@ import { Lock } from "lucide-react";
 import { toast } from "sonner";
 import type { QrDesign } from "@/lib/qr-render";
 import type { QrTypeDef } from "@/lib/qr-types";
-import { getPlan } from "@/lib/plans";
 import { api } from "@/lib/fetcher";
 import { Alert, Button, Field, Input, Modal, Switch } from "@/components/ui";
 import { useApp } from "@/components/providers";
@@ -24,7 +23,7 @@ export function SaveDialog({ open, onClose, type, content, design, dynamic, host
   dynamic: boolean; hosted: boolean; defaultName: string; onSaved: (q: SavedQr) => void;
 }) {
   const { user } = useApp();
-  const plan = getPlan(user?.plan);
+  const plan = { name: user?.planName ?? "Free", customAlias: !!user?.limits.customAlias, expiry: !!user?.limits.expiry };
   const [name, setName] = useState(defaultName);
   const [campaign, setCampaign] = useState("");
   const [alias, setAlias] = useState("");
@@ -77,10 +76,10 @@ export function SaveDialog({ open, onClose, type, content, design, dynamic, host
         {(dynamic || hosted) && (
           <>
             <Field label={<span className="inline-flex items-center gap-1.5">Custom alias {!plan.customAlias && <Lock className="h-3 w-3" />}</span>}
-              hint={plan.customAlias ? "Letters, numbers, - and _. Leave empty for a random code." : <>Available on Pro. <Link className="text-brand underline" href="/pricing">Upgrade</Link></>}>
+              hint={plan.customAlias ? "Letters, numbers, - and _. Leave empty for a random code." : <>Not included in the {plan.name} plan. <Link className="text-brand underline" href="/pricing">Compare plans</Link></>}>
               <Input value={alias} onChange={(e) => setAlias(e.target.value)} disabled={!plan.customAlias} placeholder="e.g. diwali-sale" />
             </Field>
-            <Field label={<span className="inline-flex items-center gap-1.5">Expiry date {!plan.expiry && <Lock className="h-3 w-3" />}</span>} hint={plan.expiry ? "After this, scans show an “expired” page." : "Available on Pro."}>
+            <Field label={<span className="inline-flex items-center gap-1.5">Expiry date {!plan.expiry && <Lock className="h-3 w-3" />}</span>} hint={plan.expiry ? "After this, scans show an “expired” page." : `Not included in the ${plan.name} plan.`}>
               <Input type="datetime-local" value={expires} onChange={(e) => setExpires(e.target.value)} disabled={!plan.expiry} />
             </Field>
             <Switch checked={track} onChange={setTrack} label="Detailed scan analytics"

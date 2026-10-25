@@ -2,7 +2,7 @@ import { z } from "zod";
 import { db } from "@/lib/db";
 import { ApiError, handle, json, readJson } from "@/lib/api";
 import { requireUser } from "@/lib/session";
-import { getPlan } from "@/lib/plans";
+import { planForUser } from "@/lib/plan-store";
 import { BARCODE_MAP, lookupKey, validateBarcode } from "@/lib/barcodes";
 import { createProduct, moveStock, updateProduct } from "@/lib/products";
 import { logEvent } from "@/lib/log";
@@ -39,8 +39,8 @@ function toInput(r: Record<string, unknown>) {
 export const POST = handle(async (req) => {
   const user = await requireUser();
   const { mode, rows } = await readJson(req, schema);
-  const plan = getPlan(user.plan);
-  if (rows.length > plan.bulkRows) throw new ApiError(403, `Your ${plan.name} plan imports up to ${plan.bulkRows.toLocaleString("en-IN")} rows at a time.`);
+  const plan = await planForUser(user);
+  if (rows.length > plan.limits.bulkRows) throw new ApiError(403, `Your ${plan.name} plan imports up to ${plan.limits.bulkRows.toLocaleString("en-IN")} rows at a time.`);
 
   const results: Result[] = [];
   const seenSku = new Map<string, number>();

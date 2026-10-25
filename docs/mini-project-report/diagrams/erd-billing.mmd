@@ -1,0 +1,56 @@
+%% Figure 4.18: ERD detail: pricing plans, subscriptions and payments
+erDiagram
+  User { string id PK }
+  PricingPlan {
+    string id PK "e.g. pro"
+    string name
+    string currency
+    int monthlyPrice "minor units"
+    int annualPrice "minor units"
+    string features "JSON"
+    string limits "JSON entitlements"
+    string status "draft|published|archived"
+    int sortOrder
+  }
+  ProviderPlan {
+    string id PK
+    string planId FK
+    string interval "month|year"
+    int amount
+    string mode "test|live"
+    string providerPlanId UK
+    boolean active
+  }
+  Subscription {
+    string id PK
+    string userId FK
+    string planId "snapshot, no FK"
+    string interval
+    int amount
+    string mode
+    string providerSubscriptionId UK
+    string status
+    datetime currentPeriodEnd "nullable"
+    boolean cancelAtPeriodEnd
+  }
+  Payment {
+    string id PK
+    string userId FK
+    string subscriptionId FK "nullable"
+    string providerRef UK
+    string plan "snapshot"
+    int amount
+    string status
+    int refundedAmount
+  }
+  WebhookEvent {
+    string id PK
+    string provider "UK with eventId"
+    string eventId
+    string eventType
+    string status
+  }
+  PricingPlan ||--o{ ProviderPlan : "synced as"
+  User ||--o{ Subscription : subscribes
+  User ||--o{ Payment : pays
+  Subscription |o--o{ Payment : charges

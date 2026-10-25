@@ -1,0 +1,53 @@
+@startuml
+' Figure 4.2 (PlantUML source). Not rendered locally: no Java/PlantUML runtime was available.
+left to right direction
+skinparam packageStyle rectangle
+actor "Visitor" as V
+actor "Registered user" as U
+actor "Admin" as A
+actor "Super admin" as SA
+actor "Razorpay" as RZ <<system>>
+SA -|> A
+rectangle "QRSathi" {
+  usecase "Sign up / sign in" as UC1
+  usecase "Reset password" as UC2
+  usecase "Generate static QR" as UC3
+  usecase "Create dynamic QR / hosted page" as UC4
+  usecase "Generate barcodes & labels" as UC5
+  usecase "Scan QR / barcode" as UC6
+  usecase "Manage products & barcodes" as UC7
+  usecase "Record stock movement" as UC8
+  usecase "Bulk generate / import" as UC9
+  usecase "View analytics / export" as UC10
+  usecase "Subscribe to paid plan" as UC11
+  usecase "Open dynamic QR" as UC12
+  usecase "Report abusive QR" as UC13
+  usecase "Moderate users, codes, reports" as UC14
+  usecase "Edit settings & branding" as UC15
+  usecase "Manage plans & pricing" as UC16
+  usecase "Manage roles, payment credentials, delete accounts" as UC17
+  usecase "Enrol TOTP MFA" as UC18
+  usecase "Deliver payment webhook" as UC19
+}
+V --> UC12
+V --> UC13
+V --> UC6
+U --> UC1
+U --> UC2
+U --> UC3
+U --> UC4
+U --> UC5
+U --> UC6
+U --> UC7
+U --> UC8
+U --> UC9
+U --> UC10
+U --> UC11
+A --> UC14
+A --> UC15
+A --> UC18
+SA --> UC16
+SA --> UC17
+RZ --> UC19
+UC11 ..> UC19 : <<include>>
+@enduml

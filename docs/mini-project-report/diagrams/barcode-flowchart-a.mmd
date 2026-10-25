@@ -1,0 +1,11 @@
+%% Figure 4.9(a): Flowchart: barcode generation
+flowchart TD
+  S([Start]) --> F[Select format, e.g. EAN-13,<br/>Code 128, Data Matrix]
+  F --> V[Enter value]
+  V --> VAL{validateBarcode: characters,<br/>length, check digit}
+  VAL -- Invalid --> ERR[Explain the rule] --> V
+  VAL -- Valid --> R[bwip-js renders SVG]
+  R --> L{Label needed?}
+  L -- Yes --> LB[Compose label: size,<br/>product name, price] --> X
+  L -- No --> X[Export PNG / SVG / PDF]
+  X --> E([End])

@@ -1,0 +1,12 @@
+%% Figure 4.10(a): Flowchart: product creation
+flowchart TD
+  S([Start]) --> NP[Enter product: name, SKU, price,<br/>stock, low-stock level, barcodes]
+  NP --> V{Product schema valid?}
+  V -- No --> E400[400 validation error] --> NP
+  V -- Yes --> BC{Barcodes valid? Internal<br/>GTIN uses prefix 20-29?}
+  BC -- No --> E400
+  BC -- Yes --> U{SKU and barcodes unique<br/>for this user?}
+  U -- No --> E409[409 duplicate] --> NP
+  U -- Yes --> Q{Product and barcode<br/>quota OK?}
+  Q -- No --> E403[403 plan limit] --> E([End])
+  Q -- Yes --> C[Create Product + Barcodes +<br/>ledger entry 'created'] --> E

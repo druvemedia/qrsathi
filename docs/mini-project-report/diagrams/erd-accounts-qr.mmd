@@ -1,0 +1,83 @@
+%% Figure 4.16: ERD detail: accounts, sessions, QR codes and analytics
+erDiagram
+  User {
+    string id PK "cuid"
+    string email UK
+    string passwordHash "nullable, bcrypt"
+    string googleId UK "nullable"
+    string role "user|admin|super_admin"
+    string plan "plan id"
+    datetime planExpiresAt "nullable"
+    string status "active|suspended"
+    int sessionVersion
+    string mfaSecret "nullable, AES-GCM"
+    datetime mfaEnabledAt "nullable"
+    int mfaLastStep
+    int quotaLock
+  }
+  Session {
+    string id PK
+    string userId FK
+    string kind "user|admin"
+    boolean mfa
+    datetime expiresAt
+    datetime lastSeenAt
+    datetime reauthAt "nullable"
+  }
+  MfaRecoveryCode {
+    string id PK
+    string userId FK
+    string codeHash UK "SHA-256"
+    datetime usedAt "nullable"
+  }
+  PasswordReset {
+    string id PK
+    string userId FK
+    string tokenHash UK "SHA-256"
+    datetime expiresAt
+    datetime usedAt "nullable"
+  }
+  QrCode {
+    string id PK
+    string userId FK
+    string type
+    string content "JSON"
+    string design "JSON"
+    string payload
+    boolean isDynamic
+    boolean isHosted
+    string shortCode UK "nullable"
+    string destination "nullable"
+    string status "active|paused|disabled"
+    datetime expiresAt "nullable"
+  }
+  Scan {
+    string id PK
+    string qrId FK
+    string device
+    string browser
+    string os
+    string country
+    string visitorHash
+  }
+  Download {
+    string id PK
+    string userId FK
+    string qrId FK "nullable"
+    string format
+  }
+  Upload {
+    string id PK
+    string userId FK
+    string storedName UK
+    string mime
+    int size
+  }
+  User ||--o{ Session : has
+  User ||--o{ MfaRecoveryCode : has
+  User ||--o{ PasswordReset : requests
+  User ||--o{ QrCode : owns
+  User ||--o{ Download : records
+  User ||--o{ Upload : stores
+  QrCode ||--o{ Scan : receives
+  QrCode |o--o{ Download : "exported as"

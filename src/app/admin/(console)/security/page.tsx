@@ -4,14 +4,14 @@ import { PageHeader } from "@/components/ui";
 import { requirePageAdmin } from "@/lib/guard";
 import { SecurityView } from "./security-view";
 
-export const metadata: Metadata = { title: "Security & audit" };
+export const metadata: Metadata = { title: "Audit log" };
 
 export default async function AdminSecurityPage({ searchParams }: { searchParams: Promise<{ category?: string }> }) {
   await requirePageAdmin("/admin/security");
   const { category } = await searchParams;
   return (
     <>
-      <PageHeader icon={<ShieldCheck />} title="Security & audit log" description="Sign-in activity, administrator accounts and every administrative action. Secrets and tokens are redacted before they're stored." />
+      <PageHeader icon={<ShieldCheck />} title="Audit log" description="Every administrative action and security event: who, what, target, when. Secrets and tokens are redacted before they're stored." />
       <SecurityView initialCategory={["admin", "auth", "failures"].includes(category || "") ? category! : ""} />
     </>
   );

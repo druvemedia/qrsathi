@@ -1,0 +1,39 @@
+%% Figure 4.20: Sequence diagram: workspace login and administrator MFA login
+sequenceDiagram
+  autonumber
+  actor U as User / Admin
+  participant B as Browser
+  participant MW as middleware.ts
+  participant L as /api/auth/login or /api/admin/auth/login
+  participant AF as lib/auth-flow.ts
+  participant RL as lib/rate-limit.ts
+  participant DB as Prisma + DB
+  U->>B: enter e-mail and password
+  B->>MW: POST (Origin header)
+  MW->>MW: origin in allowedOrigins?
+  alt cross-site
+    MW-->>B: 403 Cross-site request blocked
+  end
+  MW->>L: forward
+  L->>AF: verifyCredentials(email, password, scope)
+  AF->>RL: per-IP, per-account, global limits
+  RL-->>AF: ok or 429
+  AF->>DB: findUnique(User by email)
+  alt unknown account or wrong password
+    AF->>DB: AuditLog login_failed
+    AF-->>L: ApiError 401 (generic)
+    L-->>B: 401 Incorrect email or password
+  else valid and active
+    AF-->>L: user
+    alt workspace login
+      L->>DB: create Session(kind=user)
+      L-->>B: 200 + Set-Cookie qs_session (HttpOnly, SameSite=Lax)
+    else admin login with MFA enabled
+      L-->>B: 200 {mfaRequired, ticket (5 min)}
+      U->>B: enter TOTP code
+      B->>L: POST /api/admin/auth/mfa {ticket, code}
+      L->>DB: updateMany(mfaLastStep < step) replay guard
+      L->>DB: create Session(kind=admin, mfa=true), AuditLog
+      L-->>B: 200 + Set-Cookie qs_admin (SameSite=Strict)
+    end
+  end

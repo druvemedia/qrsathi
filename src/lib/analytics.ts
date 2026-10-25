@@ -1,7 +1,7 @@
 import type { User } from "@prisma/client";
 import { db } from "./db";
 import { ApiError } from "./api";
-import { getPlan } from "./plans";
+import { planForUser } from "./plan-store";
 
 export async function scopeQrIds(user: User, qrId: string | null) {
   if (qrId) {
@@ -13,8 +13,11 @@ export async function scopeQrIds(user: User, qrId: string | null) {
   return rows.map((r) => r.id);
 }
 
-export function clampDays(user: User, days: number) {
-  const max = getPlan(user.plan).analyticsDays;
+/** Clamps the requested range to the plan's analytics history; 403 if analytics aren't included. */
+export async function clampDays(user: User, days: number) {
+  const plan = await planForUser(user);
+  const max = plan.limits.analyticsDays;
+  if (max <= 0) throw new ApiError(403, `Scan analytics aren't included in the ${plan.name} plan. Upgrade your plan to see them.`);
   return Math.max(1, Math.min(Number.isFinite(days) ? days : 30, max));
 }
 

@@ -5,12 +5,12 @@ import { hashPassword, passwordSchema, verifyPassword } from "@/lib/auth-helpers
 import { createSession, destroySession, publicUser, requireUser, revokeAllSessions } from "@/lib/session";
 import { audit } from "@/lib/audit";
 import { rateLimit } from "@/lib/rate-limit";
-import { getPlan } from "@/lib/plans";
+import { planForUser } from "@/lib/plan-store";
 import { deleteStoredFile } from "@/lib/storage";
 
 export const GET = handle(async () => {
   const user = await requireUser();
-  const plan = getPlan(user.plan);
+  const plan = await planForUser(user);
   const [total, dynamic, hosted, downloads] = await Promise.all([
     db.qrCode.count({ where: { userId: user.id } }),
     db.qrCode.count({ where: { userId: user.id, isDynamic: true, isHosted: false } }),
@@ -18,7 +18,7 @@ export const GET = handle(async () => {
     db.download.count({ where: { userId: user.id } }),
   ]);
   return json({
-    user: publicUser(user),
+    user: await publicUser(user),
     plan,
     usage: { saved: total, dynamic, hosted, downloads },
   });
@@ -50,7 +50,7 @@ export const PATCH = handle(async (req) => {
     await createSession(updated, { kind: "user" }); // keep this device signed in
     await audit("auth.password_changed", { actor: { id: updated.id } });
   }
-  return json({ user: publicUser(updated) });
+  return json({ user: await publicUser(updated) });
 });
 
 export const DELETE = handle(async (req) => {

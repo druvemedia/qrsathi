@@ -64,7 +64,10 @@ Both use one accounts table but separate session cookies and separate authorisat
 | **Users** | Search, filters, sorting and pagination. Suspend/reactivate, sign out everywhere, send a reset link, change plan. Role changes and deletion are super-admin only. Bulk actions ask for confirmation. |
 | **QR codes / Abuse reports** | Moderation of public-facing dynamic redirects and hosted pages. |
 | **Products & inventory** | Platform-wide aggregates only; customers' catalogues stay private. |
-| **Analytics, Subscriptions, Payments** | Aggregate activity; plan distribution; signature-verified payments only. |
+| **Analytics, Subscriptions, Payments** | Aggregate activity; Razorpay subscriptions (cancel at period end or now); payment history with refunds. |
+| **Plans & pricing** | Create, edit, duplicate, publish, archive and reorder plans. Prices in minor units; entitlements enforced by the server; live preview; Razorpay plan sync ([docs/BILLING.md](docs/BILLING.md)). |
+| **Website branding / Appearance** | Titles, SEO and social text, contact details, logos (light and dark), favicon, social image, colours, default theme. Draft → preview → publish. |
+| **Payment gateway / Email** | Razorpay test and live credentials (encrypted, never shown again), read-only connection test, checkout switch. SMTP status and a test e-mail. |
 | **Security & audit** | Sign-in failures, administrator list with 2FA status, full audit log. |
 | **Site settings / System** | Branding and sign-up policy. Health, configuration flags (never secret values) and the application error log. |
 
@@ -108,6 +111,7 @@ BASE_URL=http://localhost:3000 npm run test:api
 BASE_URL=http://localhost:3000 DATABASE_URL=file:/abs/path/to/that.db npm run test:admin
 BASE_URL=http://localhost:3000 DATABASE_URL=file:/abs/path/to/that.db npm run test:browser   # needs Edge or Chrome
 
+BASE_URL=http://localhost:3000 DATABASE_URL=file:/abs/path/to/that.db npm run test:billing   # starts a Razorpay mock on :3999
 MYSQL_TEST_URL="mysql://root:pw@127.0.0.1:3306/" npm run test:mysql   # real MySQL; creates and drops its own databases
 ```
 
@@ -119,6 +123,13 @@ Never point the integration tests at a production database: they create and dele
 | `test:api` | Auth and CSRF, products, barcode lookup, stock, isolation between users, import, existing QR/UPI/dynamic features. |
 | `test:admin` | Sign-up can't create admins, admin APIs deny by default, separate admin login, MFA enrolment, replay and recovery codes, logout invalidation, RBAC, suspension, last-super-admin rules, audit log, reset tokens, session fixation, uploads, rate limits, webhook signature and idempotency, no secrets in client bundles. |
 | `test:browser` | Camera and image scanning. Every public, workspace and admin page at 375/768/1280 px (no horizontal overflow, no CSP violations, no console errors, accessible names). Admin sign-in through the real form. Run with `DARK=1` for dark mode. |
+| `test:billing` | Against a deterministic Razorpay **mock** (needs `RAZORPAY_API_BASE` + `SETTINGS_ENCRYPTION_KEY` on the server):
+- credential masking, encryption and re-auth;
+- signature and webhook verification, duplicates, mismatches;
+- activation only after confirmation;
+- failure, renewal, halt, cancel and refund;
+- pricing CRUD and history integrity; server-priced checkout;
+- quota races, branding uploads and XSS; no secret leaks. |
 | `test:mysql` | Migrations on a fresh MySQL server, an edge-case SQLite → MySQL copy, case-sensitive identifiers, constraints and failure safety. |
 
 CI (`.github/workflows/ci.yml`) runs:

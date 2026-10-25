@@ -1,7 +1,9 @@
 import { promises as fs } from "fs";
 import path from "path";
 import { db } from "./db";
-import { demoMode, googleConfigured, razorpayConfigured } from "./config";
+import { demoMode, googleConfigured } from "./config";
+import { publicPaymentStatus } from "./payment-config";
+import { settingsKeyAvailable } from "./secret-box";
 import { mailConfigured } from "./mail";
 
 export const APP_VERSION = process.env.npm_package_version || "1.0.0";
@@ -37,7 +39,7 @@ export async function checkStorage() {
 
 /** Detailed status for the admin System page. Booleans only — never secret values. */
 export async function systemStatus() {
-  const [database, storage] = await Promise.all([checkDatabase(), checkStorage()]);
+  const [database, storage, pay] = await Promise.all([checkDatabase(), checkStorage(), publicPaymentStatus().catch(() => null)]);
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || "";
   return {
     version: APP_VERSION,
@@ -55,8 +57,10 @@ export async function systemStatus() {
       rateLimitStore: process.env.RATE_LIMIT_STORE === "database" ? "database" : "memory",
       smtp: mailConfigured(),
       google: googleConfigured(),
-      razorpay: razorpayConfigured(),
-      razorpayWebhook: !!process.env.RAZORPAY_WEBHOOK_SECRET,
+      razorpay: !!pay?.checkoutReady,
+      razorpayMode: pay?.mode ?? "test",
+      razorpayWebhook: !!pay?.[pay.mode].webhookSecretConfigured,
+      settingsKeySet: settingsKeyAvailable(),
       demoMode: demoMode(),
       adminEmailsVariableSet: !!process.env.ADMIN_EMAILS,
     },

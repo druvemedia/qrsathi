@@ -1,0 +1,14 @@
+%% Figure 4.12(b): Flowchart: subscription checkout, part (b) — confirmation
+flowchart TD
+  S([Checkout returns ids<br/>and signature]) --> SIG{HMAC-SHA256<br/>signature valid?}
+  SIG -- No --> E400[400 cannot verify]
+  SIG -- Yes --> FP[Fetch payment and subscription<br/>from Razorpay]
+  FP --> CAP{Captured with matching<br/>amount and currency?}
+  CAP -- Mismatch --> E400b[400; plan unchanged]
+  CAP -- Not yet --> PEN[Status pending]
+  CAP -- Yes --> APP[Payment paid, Subscription active,<br/>user.plan upgraded]
+  PEN --> WH[Signed webhook arrives]
+  WH --> DUP{Event id already<br/>in WebhookEvent?}
+  DUP -- Yes --> IGN[200 duplicate, no change]
+  DUP -- No --> APP
+  APP --> E([Active until period end])

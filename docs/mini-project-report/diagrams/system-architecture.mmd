@@ -1,0 +1,46 @@
+%% Figure 4.1: High-level system architecture of QRSathi
+flowchart LR
+  subgraph Client["Client tier (browser)"]
+    B["User / Admin browser<br/>React 19 client components"]
+    ZX["zxing-wasm scanner<br/>(runs in browser)"]
+    QRR["QR / barcode renderers<br/>qrcode, bwip-js (SVG)"]
+  end
+  subgraph Server["Next.js 15 application server on Node.js 22"]
+    MW["middleware.ts<br/>CSRF origin check"]
+    RSC["App Router pages<br/>(site), (app), (auth), admin"]
+    API["Route handlers<br/>src/app/api/**/route.ts"]
+    PUB["Public routes<br/>/r/[code] /p/[code] /f/[name] /brand/[name]"]
+    AUTH["Session & RBAC<br/>lib/session.ts, lib/guard.ts, lib/roles.ts"]
+    BL["Domain services<br/>qr-service, products, barcodes,<br/>billing, entitlements, scans"]
+    SEC["Cross-cutting<br/>rate-limit, audit, redact, logger, env-check"]
+    ORM["Prisma Client 6.19"]
+    FS["Local file storage<br/>UPLOAD_DIR (lib/storage.ts)"]
+  end
+  subgraph Data["Data tier"]
+    SQ[("SQLite (development)")]
+    MY[("MySQL 8 (production target)")]
+  end
+  subgraph Ext["Optional external services"]
+    RZP["Razorpay API<br/>Subscriptions + webhooks"]
+    GG["Google OAuth / OIDC"]
+    SMTP["SMTP server<br/>(password reset mail)"]
+  end
+  B -->|HTTPS| MW --> RSC
+  MW --> API
+  B --> PUB
+  B --- ZX
+  B --- QRR
+  RSC --> AUTH
+  API --> AUTH
+  API --> BL
+  PUB --> BL
+  BL --> SEC
+  BL --> ORM
+  AUTH --> ORM
+  BL --> FS
+  ORM --> SQ
+  ORM -.-> MY
+  BL -.->|REST, Basic auth| RZP
+  RZP -.->|signed webhook| API
+  API -.->|authorization code flow| GG
+  BL -.->|nodemailer| SMTP

@@ -42,6 +42,11 @@ export const TYPES = {
   "Session.userAgent": "@db.VarChar(255)",
   "AuditLog.details": "@db.VarChar(4000)",
   "User.mfaSecret": "@db.Text",
+  "Payment.failureReason": "@db.VarChar(500)",
+  "PricingPlan.description": "@db.VarChar(500)",
+  "PricingPlan.features": "@db.VarChar(4000)", // JSON, validated max 20 × 120 chars
+  "PricingPlan.limits": "@db.VarChar(4000)", // JSON entitlements
+  "WebhookEvent.summary": "@db.VarChar(500)",
 };
 
 /** Index rewrites: InnoDB keys are limited to 3072 bytes (768 utf8mb4 chars). */

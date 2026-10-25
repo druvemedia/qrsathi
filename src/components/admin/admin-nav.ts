@@ -1,36 +1,50 @@
 import {
-  BarChart3, CreditCard, Flag, Gauge, KeyRound, Package, QrCode, Receipt, Server, Settings, ShieldCheck, Users, type LucideIcon,
+  BarChart3, Barcode, CreditCard, Flag, Gauge, KeyRound, Landmark, LayoutTemplate, Mail, Package, Palette, QrCode, Receipt,
+  ScrollText, Server, Settings, ShieldAlert, Tags, UserCog, Users, type LucideIcon,
 } from "lucide-react";
 
-export interface AdminNavItem { href: string; label: string; icon: LucideIcon; superAdmin?: boolean }
+export interface AdminNavItem { href: string; label: string; icon: LucideIcon }
 export interface AdminNavGroup { label: string; items: AdminNavItem[] }
 
 /** Admin-console navigation. Completely separate from the user workspace nav. */
 export const ADMIN_NAV: AdminNavGroup[] = [
-  { label: "Console", items: [{ href: "/admin", label: "Overview", icon: Gauge }] },
   {
     label: "Platform",
     items: [
+      { href: "/admin", label: "Overview", icon: Gauge },
       { href: "/admin/users", label: "Users", icon: Users },
       { href: "/admin/qr-codes", label: "QR codes", icon: QrCode },
-      { href: "/admin/reports", label: "Abuse reports", icon: Flag },
+      { href: "/admin/barcodes", label: "Barcodes", icon: Barcode },
       { href: "/admin/products", label: "Products & inventory", icon: Package },
       { href: "/admin/analytics", label: "Analytics", icon: BarChart3 },
+      { href: "/admin/reports", label: "Abuse reports", icon: Flag },
     ],
   },
   {
-    label: "Billing",
+    label: "Business",
     items: [
+      { href: "/admin/settings/pricing", label: "Plans & pricing", icon: Tags },
       { href: "/admin/subscriptions", label: "Subscriptions", icon: CreditCard },
       { href: "/admin/payments", label: "Payments", icon: Receipt },
     ],
   },
   {
-    label: "Operations",
+    label: "Configuration",
     items: [
-      { href: "/admin/security", label: "Security & audit", icon: ShieldCheck },
-      { href: "/admin/settings", label: "Site settings", icon: Settings },
-      { href: "/admin/system", label: "System", icon: Server },
+      { href: "/admin/settings/branding", label: "Website branding", icon: LayoutTemplate },
+      { href: "/admin/settings/appearance", label: "Appearance", icon: Palette },
+      { href: "/admin/settings/payments", label: "Payment gateway", icon: Landmark },
+      { href: "/admin/settings/email", label: "Email", icon: Mail },
+      { href: "/admin/settings", label: "General settings", icon: Settings },
+    ],
+  },
+  {
+    label: "Security",
+    items: [
+      { href: "/admin/security/events", label: "Security events", icon: ShieldAlert },
+      { href: "/admin/security/admins", label: "Administrators", icon: UserCog },
+      { href: "/admin/security", label: "Audit log", icon: ScrollText },
+      { href: "/admin/system", label: "System health", icon: Server },
     ],
   },
   { label: "My account", items: [{ href: "/admin/mfa", label: "Two-factor auth", icon: KeyRound }] },

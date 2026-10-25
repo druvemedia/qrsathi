@@ -46,7 +46,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
       disabled={disabled || loading}
       aria-busy={loading || undefined}
       className={cn(
-        "inline-flex select-none items-center justify-center whitespace-nowrap font-medium transition-colors disabled:pointer-events-none disabled:opacity-50",
+        "inline-flex select-none items-center justify-center whitespace-nowrap font-medium transition-[color,background-color,border-color,box-shadow,transform] duration-150 active:scale-[0.98] disabled:pointer-events-none disabled:opacity-50",
         variants[variant],
         sizes[size],
         className,
@@ -261,7 +261,11 @@ export function Spinner({ className }: { className?: string }) {
 }
 
 export function Skeleton({ className }: { className?: string }) {
-  return <div className={cn("animate-pulse rounded-lg bg-slate-200/70 dark:bg-slate-800", className)} aria-hidden />;
+  return (
+    <div className={cn("relative overflow-hidden rounded-lg bg-slate-200/70 dark:bg-slate-800", className)} aria-hidden>
+      <div className="absolute inset-0 -translate-x-full animate-shimmer bg-gradient-to-r from-transparent via-white/50 to-transparent dark:via-white/[0.06]" />
+    </div>
+  );
 }
 
 /** Placeholder rows for tables/lists while data loads. */
@@ -448,8 +452,8 @@ export function Modal({ open, onClose, title, children, footer, size = "md", des
   const widths = { sm: "max-w-md", md: "max-w-lg", lg: "max-w-3xl" };
   return createPortal(
     <div className="fixed inset-0 z-[60] flex items-end justify-center sm:items-center sm:p-4" role="dialog" aria-modal="true" aria-labelledby={titleId}>
-      <div className="absolute inset-0 bg-slate-950/40 backdrop-blur-[2px]" onClick={onClose} />
-      <div ref={ref} className={cn("relative flex max-h-[92vh] w-full animate-scale-in flex-col rounded-t-2xl border border-slate-200 bg-white shadow-pop dark:border-slate-800 dark:bg-slate-900 sm:rounded-2xl", widths[size])}>
+      <div className="absolute inset-0 animate-fade-in bg-slate-950/40 backdrop-blur-[2px]" onClick={onClose} />
+      <div ref={ref} className={cn("relative flex max-h-[92vh] w-full animate-dialog-in flex-col rounded-t-2xl border border-slate-200 bg-white shadow-pop dark:border-slate-800 dark:bg-slate-900 sm:rounded-2xl", widths[size])}>
         <div className="flex items-start justify-between gap-4 border-b border-slate-100 px-5 py-4 dark:border-slate-800">
           <div>
             <h2 id={titleId} className="text-base font-semibold">{title}</h2>

@@ -1,0 +1,16 @@
+%% Figure 4.10(b): Flowchart: stock movement
+flowchart TD
+  S([Movement requested]) --> AR{Product archived?}
+  AR -- Yes --> E400a[400 restore first] --> E([End])
+  AR -- No --> MV{Movement type}
+  MV -- in --> IN[stock += qty]
+  MV -- out --> OUT{stock >= qty?<br/>conditional update}
+  OUT -- No --> E400b[400 not enough stock] --> E
+  OUT -- Yes --> DEC[stock -= qty]
+  MV -- adjust --> ADJ[stock = counted qty]
+  IN --> LOG[Append InventoryTransaction<br/>signed delta + balance]
+  DEC --> LOG
+  ADJ --> LOG
+  LOG --> LOW{stock <= lowStockAt?}
+  LOW -- Yes --> FLAG[Show low-stock flag] --> E
+  LOW -- No --> E

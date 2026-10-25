@@ -1,0 +1,25 @@
+%% Figure 4.6: Flowchart: user registration and login
+flowchart TD
+  S([Start]) --> C{Has account?}
+  C -- No --> SU[Submit name, e-mail, password,<br/>accept terms]
+  SU --> RL1{Rate limit OK?<br/>10/h per IP}
+  RL1 -- No --> E429[429 Too many attempts]
+  RL1 -- Yes --> V1{Input valid?<br/>zod schema}
+  V1 -- No --> E400[400 validation message]
+  V1 -- Yes --> OPEN{Sign-ups allowed?}
+  OPEN -- No --> E403[403 sign-ups closed]
+  OPEN -- Yes --> DUP{E-mail already used?}
+  DUP -- Yes --> E409[409 account exists]
+  DUP -- No --> HASH[bcrypt hash, cost 12<br/>role forced to user]
+  HASH --> SESS
+  C -- Yes --> LI[Submit e-mail and password]
+  LI --> RL2{Per-IP, per-account and<br/>global limits OK?}
+  RL2 -- No --> E429
+  RL2 -- Yes --> FIND{Account found<br/>with password?}
+  FIND -- No --> BURN[Dummy bcrypt compare<br/>audit login_failed] --> E401[401 generic error]
+  FIND -- Yes --> PW{Password matches?}
+  PW -- No --> AUD[Audit login_failed] --> E401
+  PW -- Yes --> ACT{Status active?}
+  ACT -- No --> E403B[403 suspended]
+  ACT -- Yes --> SESS[Create Session row +<br/>signed HS256 cookie qs_session]
+  SESS --> OK([Redirect to dashboard])

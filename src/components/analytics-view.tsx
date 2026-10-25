@@ -3,7 +3,6 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { Activity, Download, Eye, FlaskConical, Info, ScanLine, Users } from "lucide-react";
 import type { AnalyticsDto } from "@/lib/analytics";
-import { getPlan } from "@/lib/plans";
 import { api } from "@/lib/fetcher";
 import { Alert, Badge, Card, EmptyState, LinkButton, Segmented, Skeleton, StatCard } from "./ui";
 import { ColumnChart, RankBars, TrendChart } from "./charts";
@@ -37,7 +36,7 @@ const fmtLabel = (grain: Grain) => (l: string) => {
 
 export function AnalyticsView({ qrId, isUpi }: { qrId?: string; isUpi?: boolean }) {
   const { user } = useApp();
-  const maxDays = getPlan(user?.plan).analyticsDays;
+  const maxDays = user?.limits.analyticsDays ?? 30;
   const [days, setDays] = useState("30");
   const [grain, setGrain] = useState<Grain>("day");
   const [data, setData] = useState<AnalyticsDto | null>(null);

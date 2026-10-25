@@ -1,0 +1,53 @@
+%% Figure 4.2: Use-case diagram (actors and principal use cases)
+flowchart LR
+  V(("Visitor /<br/>QR scanner"))
+  U(("Registered<br/>user"))
+  A(("Admin"))
+  SA(("Super admin"))
+  RZ(("Razorpay<br/>(system actor)"))
+  subgraph SYS["QRSathi system boundary"]
+    direction TB
+    UC1(["Sign up / sign in<br/>(password or Google)"])
+    UC2(["Reset password"])
+    UC3(["Generate static QR<br/>(27 content types)"])
+    UC4(["Create / edit dynamic QR<br/>and hosted page"])
+    UC5(["Generate barcodes & labels<br/>(23 formats)"])
+    UC6(["Scan QR / barcode<br/>(camera or image)"])
+    UC7(["Manage products<br/>and barcodes"])
+    UC8(["Record stock in / out / adjust"])
+    UC9(["Bulk generate / import"])
+    UC10(["View scan analytics / export"])
+    UC11(["Subscribe to a paid plan"])
+    UC12(["Open dynamic QR / hosted page"])
+    UC13(["Report abusive QR"])
+    UC14(["Moderate users, QR codes, reports"])
+    UC15(["Edit settings & branding"])
+    UC16(["Manage plans & pricing"])
+    UC17(["Manage roles, payment credentials,<br/>delete accounts"])
+    UC18(["Enrol TOTP MFA"])
+    UC19(["Deliver payment events"])
+  end
+  V --> UC12
+  V --> UC13
+  V --> UC6
+  U --> UC1
+  U --> UC2
+  U --> UC3
+  U --> UC4
+  U --> UC5
+  U --> UC6
+  U --> UC7
+  U --> UC8
+  U --> UC9
+  U --> UC10
+  U --> UC11
+  A --> UC14
+  A --> UC15
+  A --> UC18
+  SA --> UC14
+  SA --> UC15
+  SA --> UC16
+  SA --> UC17
+  SA --> UC18
+  RZ --> UC19
+  UC11 -. "«include»" .-> UC19

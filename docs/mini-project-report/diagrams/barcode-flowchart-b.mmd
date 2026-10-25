@@ -1,0 +1,14 @@
+%% Figure 4.9(b): Flowchart: barcode and QR scanning
+flowchart TD
+  S([Start]) --> SRC{Camera or image?}
+  SRC --> DEC[zxing-wasm decodes<br/>in the browser]
+  DEC --> FOUND{Code detected?}
+  FOUND -- No --> RETRY[Hint: light, focus, distance] --> SRC
+  FOUND -- Yes --> CL[Classify content and run<br/>safety heuristics]
+  CL --> HIS[Save to on-device history]
+  HIS --> LK{Signed in and<br/>product code?}
+  LK -- No --> E([End])
+  LK -- Yes --> API[GET /api/products/lookup<br/>read-only]
+  API --> M{Match by lookupKey<br/>or SKU?}
+  M -- Yes --> SHOW[Show product and<br/>stock actions] --> E
+  M -- No --> NEW[Offer to create product] --> E

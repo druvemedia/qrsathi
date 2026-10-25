@@ -1,0 +1,43 @@
+%% Figure 4.17: ERD detail: products, barcodes and inventory ledger
+erDiagram
+  User { string id PK }
+  Product {
+    string id PK
+    string userId FK
+    string name
+    string sku "UK with userId"
+    string productCode
+    string category
+    int priceMinor "paise"
+    string currency
+    int stock
+    int lowStockAt
+    string batch
+    datetime expiryDate "nullable"
+    string status "active|archived"
+  }
+  Barcode {
+    string id PK
+    string userId FK
+    string productId FK
+    string format "UK with userId, value"
+    string value
+    string lookupKey "indexed, GTIN-14"
+    string source "internal|assigned|existing"
+    boolean isPrimary
+  }
+  InventoryTransaction {
+    string id PK
+    string userId FK
+    string productId FK
+    string type "created|in|out|adjust|updated|archived|restored|imported"
+    int quantity "signed delta"
+    int balance "stock after"
+    string note
+    string reference
+  }
+  User ||--o{ Product : owns
+  User ||--o{ Barcode : owns
+  User ||--o{ InventoryTransaction : performs
+  Product ||--o{ Barcode : "identified by"
+  Product ||--o{ InventoryTransaction : ledger

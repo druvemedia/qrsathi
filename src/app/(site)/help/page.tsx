@@ -50,30 +50,53 @@ const FAQ: { section: string; items: [string, React.ReactNode][] }[] = [
       ["Are scans the same as sales or payments?", "No. A scan means someone opened the link. It doesn't mean they bought something or paid. Analytics clearly separate scans from verified transactions."],
     ],
   },
+  {
+    section: "Plans & billing",
+    items: [
+      ["How does billing work?", "Paid plans are subscriptions processed by Razorpay and renew monthly or yearly until you cancel. Card and UPI details are entered on Razorpay's checkout, never on this site."],
+      ["When does my plan change?", "Only after Razorpay confirms the payment to our server. If you close the payment window early or the payment is still processing, your plan stays the same until the confirmation arrives."],
+      ["How do I cancel?", "Settings → Billing → Cancel subscription. You keep the plan until the end of the period you've paid for; Razorpay won't charge you again."],
+      ["What happens to my codes if I downgrade?", "Nothing is deleted. Dynamic QR codes keep redirecting; you just can't create more than the Free plan allows until you're under its limits."],
+    ],
+  },
 ];
+
+const slug = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, "-");
 
 export default async function HelpPage() {
   const s = await getSettings();
   return (
-    <div className="mx-auto max-w-4xl px-4 py-16 sm:px-6">
-      <h1 className="font-display text-4xl font-extrabold tracking-tight">Help & FAQ</h1>
-      <p className="mt-3 text-slate-600 dark:text-slate-400">Can&apos;t find an answer? Email <a href={`mailto:${s.supportEmail}`} className="text-brand underline">{s.supportEmail}</a>. To report a malicious QR code use the <Link href="/report" className="text-brand underline">abuse form</Link>.</p>
-      <div className="mt-10 space-y-10">
-        {FAQ.map((g) => (
-          <section key={g.section}>
-            <h2 className="mb-3 font-display text-xl font-bold">{g.section}</h2>
-            <div className="card divide-y divide-slate-100 dark:divide-slate-800">
-              {g.items.map(([q, a]) => (
-                <details key={q} className="group p-5">
-                  <summary className="flex cursor-pointer list-none items-center justify-between gap-4 font-semibold">
-                    {q}<span className="text-xl leading-none text-slate-400 transition group-open:rotate-45">+</span>
-                  </summary>
-                  <div className="mt-3 text-sm leading-relaxed text-slate-600 dark:text-slate-300">{a}</div>
-                </details>
-              ))}
-            </div>
-          </section>
-        ))}
+    <div className="mx-auto max-w-6xl px-4 pb-24 pt-16 sm:px-6 lg:pt-24">
+      <header className="max-w-3xl">
+        <p className="text-sm font-medium text-brand">Help</p>
+        <h1 className="mt-3 font-serif text-4xl leading-tight tracking-tight sm:text-5xl">Answers to common questions.</h1>
+        <p className="mt-4 text-lg text-zinc-600 dark:text-zinc-400">
+          Can&apos;t find what you need? {s.supportEmail ? <>Write to <a href={`mailto:${s.supportEmail}`} className="text-brand hover:underline">{s.supportEmail}</a>.</> : <>See the <Link href="/contact" className="text-brand hover:underline">contact page</Link>.</>} To report a malicious QR code, use the <Link href="/report" className="text-brand hover:underline">abuse form</Link>.
+        </p>
+      </header>
+      <div className="mt-14 grid gap-12 lg:grid-cols-[220px_1fr]">
+        <nav aria-label="Help topics" className="lg:sticky lg:top-24 lg:self-start">
+          <ul className="flex flex-wrap gap-2 lg:flex-col lg:gap-1">
+            {FAQ.map((g) => <li key={g.section}><a href={`#${slug(g.section)}`} className="block rounded-md px-2 py-1.5 text-sm text-zinc-600 hover:bg-white hover:text-zinc-950 dark:text-zinc-400 dark:hover:bg-zinc-900 dark:hover:text-white">{g.section}</a></li>)}
+          </ul>
+        </nav>
+        <div className="space-y-12">
+          {FAQ.map((g) => (
+            <section key={g.section} id={slug(g.section)} className="scroll-mt-24">
+              <h2 className="font-serif text-2xl tracking-tight">{g.section}</h2>
+              <div className="mt-4 divide-y divide-zinc-200 border-y border-zinc-200 dark:divide-zinc-800 dark:border-zinc-800">
+                {g.items.map(([q, a]) => (
+                  <details key={q} className="group py-4">
+                    <summary className="flex cursor-pointer list-none items-center justify-between gap-4 font-medium marker:hidden">
+                      {q}<span className="text-lg leading-none text-zinc-400 transition-transform duration-200 group-open:rotate-45" aria-hidden>+</span>
+                    </summary>
+                    <div className="mt-3 max-w-3xl text-sm leading-relaxed text-zinc-600 dark:text-zinc-300">{a}</div>
+                  </details>
+                ))}
+              </div>
+            </section>
+          ))}
+        </div>
       </div>
     </div>
   );

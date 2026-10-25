@@ -30,5 +30,5 @@ export const POST = handle(async (req) => {
   });
   await createSession(user, { kind: "user" });
   await audit("auth.signup", { actor: { id: user.id }, ip });
-  return json({ user: publicUser(user) }, 201);
+  return json({ user: await publicUser(user) }, 201);
 });

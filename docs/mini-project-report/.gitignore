@@ -1,0 +1,5 @@
+# Re-include report assets that the repository-level .gitignore excludes by name.
+!screenshots/
+# Local tool dependencies and temporary files.
+report-tools/node_modules/
+report-tools/.tmp/

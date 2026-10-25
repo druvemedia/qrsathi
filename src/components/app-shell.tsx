@@ -7,7 +7,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ChevronDown, Menu, PanelLeftClose, PanelLeftOpen, Search, X } from "lucide-react";
-import { LogoMark } from "./brand";
+import { BrandMark, LogoMark } from "./brand";
 import { ThemeToggle, UserMenu } from "./user-menu";
 import { useApp } from "./providers";
 import { CommandPalette } from "./command-palette";
@@ -89,8 +89,7 @@ function SidebarBrand({ collapsed }: { collapsed: boolean }) {
   const { settings } = useApp();
   return (
     <Link href="/" className={cn("flex items-center gap-2.5 font-semibold tracking-tight", collapsed && "justify-center")} aria-label={`${settings.siteName} home`}>
-      <LogoMark className="h-7 w-7" />
-      {!collapsed && <span className="text-[15px]">{settings.siteName}</span>}
+      {collapsed ? <LogoMark className="h-7 w-7" /> : <BrandMark />}
     </Link>
   );
 }
@@ -208,7 +207,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </div>
         </header>
         <main id="main" className="min-w-0 flex-1 px-4 py-6 sm:px-6 lg:px-8">
-          <div className="mx-auto max-w-7xl animate-fade-up">{children}</div>
+          <div key={pathname} className="mx-auto max-w-7xl animate-page-in">{children}</div>
         </main>
       </div>
       <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} />

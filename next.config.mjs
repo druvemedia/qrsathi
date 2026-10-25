@@ -5,17 +5,18 @@ const https = (process.env.NEXT_PUBLIC_APP_URL || "").startsWith("https://");
  * Content-Security-Policy. 'unsafe-inline' scripts are needed by Next's inline
  * bootstrap and the theme script; 'wasm-unsafe-eval' by the zxing barcode
  * scanner. Images allow https: because hosted pages show user-supplied image URLs.
+ * Razorpay Checkout needs its script, its iframe and its telemetry endpoint.
  */
 const csp = [
   "default-src 'self'",
-  `script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'${dev ? " 'unsafe-eval'" : ""}`,
+  `script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https://checkout.razorpay.com${dev ? " 'unsafe-eval'" : ""}`,
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: blob: https:",
   "font-src 'self' data:",
-  `connect-src 'self'${dev ? " ws: wss:" : ""}`,
+  `connect-src 'self' https://api.razorpay.com https://lumberjack.razorpay.com${dev ? " ws: wss:" : ""}`,
   "media-src 'self' blob:",
   "worker-src 'self' blob:",
-  "frame-src 'none'",
+  "frame-src https://api.razorpay.com https://checkout.razorpay.com",
   "frame-ancestors 'self'",
   "object-src 'none'",
   "base-uri 'self'",
@@ -44,6 +45,12 @@ const nextConfig = {
   async headers() {
     return [
       { source: "/:path*", headers: securityHeaders },
+      // User uploads and brand images: a sandboxing CSP (later rules override the global one above),
+      // so even an SVG/PDF opened directly can't run script or load anything.
+      ...["/f/:path*", "/brand/:path*"].map((source) => ({
+        source,
+        headers: [{ key: "Content-Security-Policy", value: "default-src 'none'; img-src 'self' data:; style-src 'unsafe-inline'; sandbox" }],
+      })),
       // Admin console pages are never cached or indexed.
       { source: "/admin/:path*", headers: [{ key: "Cache-Control", value: "no-store" }, { key: "X-Robots-Tag", value: "noindex, nofollow" }] },
       { source: "/admin", headers: [{ key: "Cache-Control", value: "no-store" }, { key: "X-Robots-Tag", value: "noindex, nofollow" }] },

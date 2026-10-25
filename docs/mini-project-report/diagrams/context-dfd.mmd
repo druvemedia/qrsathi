@@ -1,0 +1,20 @@
+%% Figure 4.3: Context-level data-flow diagram (Level 0)
+flowchart LR
+  U["Registered user"]
+  V["Public visitor<br/>(scans a code)"]
+  A["Administrator /<br/>super administrator"]
+  R["Razorpay"]
+  G["Google OAuth"]
+  M["SMTP mail server"]
+  P(("0<br/>QRSathi<br/>platform"))
+  U -->|credentials, QR content, products,<br/>stock movements, uploads| P
+  P -->|QR / barcode images, analytics,<br/>product & stock data, billing status| U
+  V -->|short-code request, abuse report| P
+  P -->|302 redirect, hosted page, file| V
+  A -->|moderation actions, settings,<br/>plans, payment credentials| P
+  P -->|users, codes, reports, audit log,<br/>statistics| A
+  P -->|create plan / subscription,<br/>fetch payment| R
+  R -->|signed webhook events,<br/>payment status| P
+  P -->|authorization code| G
+  G -->|verified e-mail, profile| P
+  P -->|password-reset mail| M

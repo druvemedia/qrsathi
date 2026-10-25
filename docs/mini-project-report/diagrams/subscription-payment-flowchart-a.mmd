@@ -1,0 +1,12 @@
+%% Figure 4.12(a): Flowchart: subscription checkout, part (a) — starting checkout
+flowchart TD
+  S([User selects plan<br/>and interval]) --> CR{Checkout enabled,<br/>credentials verified?}
+  CR -- No --> E503[503 unavailable]
+  CR -- Yes --> PP{Plan published, paid,<br/>interval offered?}
+  PP -- No --> E404[404 / 400]
+  PP -- Yes --> LV{Live subscription<br/>already exists?}
+  LV -- Yes --> E409[409 cancel first]
+  LV -- No --> PRV{Active ProviderPlan for<br/>price, currency, mode?}
+  PRV -- No --> E409b[409 not ready]
+  PRV -- Yes --> RS[Create Razorpay subscription;<br/>store Subscription 'created']
+  RS --> CO([Razorpay Checkout<br/>continues in part b])

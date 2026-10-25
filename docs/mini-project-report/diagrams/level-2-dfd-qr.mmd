@@ -1,0 +1,36 @@
+%% Figure 4.5: Level-2 DFD: QR code creation and dynamic resolution (processes 2.0 and 3.0)
+flowchart TB
+  U["User"]
+  V["Visitor"]
+  P21(("2.1<br/>Validate content<br/>against type schema"))
+  P22(("2.2<br/>Decide static /<br/>dynamic / hosted"))
+  P23(("2.3<br/>Allocate short code<br/>or alias"))
+  P24(("2.4<br/>Check plan quota<br/>(withQuota tx)"))
+  P25(("2.5<br/>Store QR and<br/>return payload"))
+  P31(("3.1<br/>Look up short code"))
+  P32(("3.2<br/>Check status, owner,<br/>expiry"))
+  P33(("3.3<br/>Record scan<br/>(privacy filters)"))
+  P34(("3.4<br/>Append UTM and<br/>redirect"))
+  D2[("D2 QrCode")]
+  D1[("D1 User")]
+  D5[("D5 PricingPlan")]
+  D3[("D3 Scan")]
+  U -->|name, type, content, design, dynamic flag, alias| P21
+  P21 -->|validated data| P22
+  P22 -->|dynamic or hosted| P23
+  P22 -->|static payload| P24
+  P23 -->|existing codes| D2
+  P23 --> P24
+  D5 -->|limits| P24
+  D1 -->|quotaLock row| P24
+  P24 --> P25
+  P25 -->|insert| D2
+  P25 -->|payload, short URL| U
+  V -->|GET /r/code| P31
+  D2 --> P31
+  P31 --> P32
+  P32 -->|410 / 404 page| V
+  P32 --> P33
+  P33 -->|device, browser, OS, country,<br/>salted visitor hash| D3
+  P33 --> P34
+  P34 -->|302 Location| V

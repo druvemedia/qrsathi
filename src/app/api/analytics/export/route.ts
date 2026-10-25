@@ -2,6 +2,7 @@ import { db } from "@/lib/db";
 import { handle } from "@/lib/api";
 import { requireUser } from "@/lib/session";
 import { clampDays, scopeQrIds } from "@/lib/analytics";
+import { requireFeature } from "@/lib/entitlements";
 
 const csvCell = (v: string) => {
   // Guard against CSV/formula injection in spreadsheet apps.
@@ -11,9 +12,10 @@ const csvCell = (v: string) => {
 
 export const GET = handle(async (req) => {
   const user = await requireUser();
+  await requireFeature(user, "analyticsExport");
   const sp = new URL(req.url).searchParams;
   const ids = await scopeQrIds(user, sp.get("qrId"));
-  const days = clampDays(user, Number(sp.get("days") || 30));
+  const days = await clampDays(user, Number(sp.get("days") || 30));
   const from = new Date(Date.now() - days * 86400000);
   const scans = await db.scan.findMany({
     where: { qrId: { in: ids }, createdAt: { gte: from } },

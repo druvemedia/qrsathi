@@ -87,7 +87,7 @@ function columnLimits() {
 }
 
 /** Columns given binary collation in the init migration (exact comparison). */
-const BINARY = new Set(["QrCode.shortCode", "Product.sku", "Barcode.value", "Barcode.lookupKey", "Upload.storedName", "Payment.providerRef", "PasswordReset.tokenHash", "MfaRecoveryCode.codeHash", "RateLimit.key"]);
+const BINARY = new Set(["QrCode.shortCode", "Subscription.providerSubscriptionId", "ProviderPlan.providerPlanId", "WebhookEvent.eventId", "BrandAsset.storedName", "Product.sku", "Barcode.value", "Barcode.lookupKey", "Upload.storedName", "Payment.providerRef", "PasswordReset.tokenHash", "MfaRecoveryCode.codeHash", "RateLimit.key"]);
 const PREFIX: Record<string, number> = { "Barcode.value": 512 };
 
 /** Approximate MySQL key equality: PAD SPACE always; case/accent-folding for *_ci columns. */

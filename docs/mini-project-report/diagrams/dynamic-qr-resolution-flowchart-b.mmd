@@ -1,0 +1,10 @@
+%% Figure 4.11(b): Flowchart: dynamic QR resolution, part (b) — scan recording and redirect
+flowchart TD
+  S([Valid destination]) --> BOT{User agent<br/>is a bot?}
+  BOT -- Yes --> RD
+  BOT -- No --> RL{Under 20 scans per client<br/>per 10 min?}
+  RL -- No --> RD
+  RL -- Yes --> DNT{DNT / GPC or<br/>tracking off?}
+  DNT -- Yes --> CNT[Insert count-only Scan] --> RD
+  DNT -- No --> DET[Insert Scan: device, browser,<br/>OS, country, salted daily hash] --> RD
+  RD[Append UTM; 302 redirect<br/>no-store, no-referrer] --> E([End])

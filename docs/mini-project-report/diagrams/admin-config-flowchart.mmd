@@ -1,0 +1,20 @@
+%% Figure 4.13: Flowchart: administrator configuration workflow
+flowchart TD
+  S([Admin opens /admin/login]) --> L{Password valid and<br/>role admin/super_admin?}
+  L -- No --> E401[Generic 401]
+  L -- Yes --> MF{MFA enabled?}
+  MF -- Yes --> T{TOTP or recovery code valid<br/>and not replayed?}
+  T -- No --> E401
+  T -- Yes --> SES
+  MF -- No --> SA{Super admin?}
+  SA -- Yes --> ENR[Forced to /admin/mfa enrolment] --> SES
+  SA -- No --> SES[Admin session qs_admin<br/>12 h, 2 h idle, SameSite=Strict]
+  SES --> W{Which setting?}
+  W -- General / branding --> BR[Edit draft, validate colours & assets] --> PUB[Publish] --> AUD
+  W -- Pricing plans --> SUP{Super admin?}
+  SUP -- No --> F403[403]
+  SUP -- Yes --> PL[Create / edit plan, sync<br/>Razorpay provider plan] --> AUD
+  W -- Payment credentials --> RA{Re-authenticated in<br/>last 15 min?}
+  RA -- No --> RE[Confirm password + TOTP] --> RA
+  RA -- Yes --> SEAL[Seal secrets with AES-256-GCM<br/>SETTINGS_ENCRYPTION_KEY] --> VER[Verify via read-only API call] --> AUD
+  AUD[Write AuditLog entry<br/>field names only, no secrets] --> E([End])

@@ -1,0 +1,39 @@
+%% Figure 4.24: Sequence diagram: subscription checkout, verification and webhook
+sequenceDiagram
+  autonumber
+  actor U as User
+  participant B as Browser + Razorpay Checkout
+  participant API as /api/billing/*
+  participant BL as lib/billing.ts
+  participant RZ as Razorpay API
+  participant DB as Prisma + DB
+  U->>B: choose plan and interval
+  B->>API: POST /subscribe {planId, interval}
+  API->>BL: startSubscription()
+  BL->>DB: plan, live subscription, active ProviderPlan
+  BL->>RZ: POST /v1/subscriptions
+  RZ-->>BL: subscription id
+  BL->>DB: INSERT Subscription(status=created)
+  API-->>B: checkout parameters
+  B->>RZ: customer pays in Checkout
+  RZ-->>B: payment_id, subscription_id, signature
+  B->>API: POST /verify
+  API->>BL: confirmCheckout()
+  BL->>BL: HMAC-SHA256(payment|subscription, key secret)
+  BL->>RZ: GET payment, GET subscription
+  alt captured and amount matches
+    BL->>DB: tx: Payment paid, Subscription active, User.plan
+    API-->>B: {status: active}
+  else not captured yet
+    API-->>B: {status: pending}
+  end
+  RZ->>API: POST /webhook (x-razorpay-signature)
+  API->>BL: handleRazorpayWebhook(raw, sig, eventId)
+  BL->>BL: verify HMAC over raw body
+  BL->>DB: WebhookEvent seen?
+  alt duplicate
+    API-->>RZ: 200 duplicate
+  else new
+    BL->>DB: apply event idempotently, record WebhookEvent
+    API-->>RZ: 200 processed
+  end

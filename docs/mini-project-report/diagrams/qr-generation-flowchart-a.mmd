@@ -1,0 +1,12 @@
+%% Figure 4.8(a): Flowchart: QR generation, part (a) — in the browser
+flowchart TD
+  S([Start]) --> T[Choose QR type<br/>and fill form]
+  T --> CV{zod validation<br/>passes?}
+  CV -- No --> FE[Show field errors] --> T
+  CV -- Yes --> D[Customise design: colours,<br/>modules, logo, frame]
+  D --> PR[Render SVG preview<br/>lib/qr-render.ts]
+  PR --> W{Contrast or<br/>logo warnings?}
+  W -- Yes --> D
+  W -- No --> CH{Save to account?}
+  CH -- No --> EX[Export PNG / JPG / SVG / PDF] --> E([End])
+  CH -- Yes --> P2([Continue in part b])

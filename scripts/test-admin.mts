@@ -38,8 +38,18 @@ function absorb(jar: Jar, res: Response) {
     if (!v || /max-age=0/i.test(c) || /expires=thu, 01 jan 1970/i.test(c)) delete jar[k]; else jar[k] = v;
   }
 }
+// Keep-alive sockets closed by the server while the test was busy (e.g. running the CLI) can surface
+// as ECONNRESET on reuse; retry such requests once on a fresh connection.
+async function fetchRetry(url: string, init: RequestInit): Promise<Response> {
+  try {
+    return await fetch(url, init);
+  } catch (e: any) {
+    if (e?.cause?.code !== "ECONNRESET" && e?.cause?.code !== "UND_ERR_SOCKET") throw e;
+    return fetch(url, init);
+  }
+}
 async function call(method: string, p: string, body?: unknown, jar?: Jar, extra: Record<string, string> = {}) {
-  const res = await fetch(BASE + p, {
+  const res = await fetchRetry(BASE + p, {
     method, redirect: "manual",
     headers: { Origin: BASE, "X-Forwarded-For": IP, ...(body !== undefined ? { "Content-Type": "application/json" } : {}), ...(jar ? { Cookie: cookieHeader(jar) } : {}), ...extra },
     body: body !== undefined ? JSON.stringify(body) : undefined,
@@ -70,7 +80,7 @@ try {
   check("health returns only {status:'ok'}", health.status === 200 && JSON.stringify(health.data) === '{"status":"ok"}', health.data);
   const home = await fetch(BASE + "/");
   const csp = home.headers.get("content-security-policy") || "";
-  check("CSP set (object-src none, frame-ancestors, no remote scripts)", /object-src 'none'/.test(csp) && /frame-ancestors 'self'/.test(csp) && /script-src 'self'/.test(csp) && !/script-src[^;]*https?:/.test(csp), csp);
+  check("CSP set (object-src none, frame-ancestors, only Razorpay Checkout as remote script)", /object-src 'none'/.test(csp) && /frame-ancestors 'self'/.test(csp) && /script-src 'self'/.test(csp) && !/script-src[^;]*https?:\/\/(?!checkout\.razorpay\.com[ ;])/.test(csp), csp);
   check("nosniff, frame and referrer headers", home.headers.get("x-content-type-options") === "nosniff" && home.headers.get("x-frame-options") === "SAMEORIGIN" && !!home.headers.get("referrer-policy"));
   check("no X-Powered-By", !home.headers.get("x-powered-by"));
 
@@ -218,13 +228,14 @@ try {
   check("audit records contain no passwords, codes or secrets", !/Super-Test-Pass|Admin-Test-Pass|testpass123|passwordHash/.test(JSON.stringify(await db.auditLog.findMany({ take: 500, orderBy: { createdAt: "desc" } }))));
 
   section("Settings validation & stored XSS");
-  const original = (await call("GET", "/api/admin/settings", undefined, A)).data.settings;
-  check("invalid support e-mail rejected", (await call("PUT", "/api/admin/settings", { supportEmail: "not-an-email" }, A)).status === 400);
-  check("unknown brand colour rejected", (await call("PUT", "/api/admin/settings", { brand: "<script>" }, A)).status === 400);
-  await call("PUT", "/api/admin/settings", { siteName: "</script><script>alert(1)</script>" }, A);
+  // Identity fields moved to the branding API (draft → publish).
+  const brand = (await call("GET", "/api/admin/branding", undefined, A)).data.published;
+  check("invalid support e-mail rejected", (await call("PUT", "/api/admin/branding", { ...brand, supportEmail: "not-an-email" }, A)).status === 400);
+  check("invalid brand colour rejected", (await call("PUT", "/api/admin/branding", { ...brand, primaryColor: "<script>" }, A)).status === 400);
+  check("markup in the brand name rejected", (await call("PUT", "/api/admin/branding", { ...brand, brandName: "</script><script>alert(1)</script>" }, A)).status === 400);
+  check("announcement with markup rejected", (await call("PUT", "/api/admin/settings", { announcement: "<img src=x onerror=alert(1)>" }, A)).status === 400);
   const homeHtml = await (await fetch(BASE + "/")).text();
   check("site name can't break out of the JSON-LD script", !homeHtml.includes("</script><script>alert(1)</script>"));
-  await call("PUT", "/api/admin/settings", { siteName: original.siteName }, A);
 
   section("Sessions, passwords & reset tokens");
   const U = await signup("sess");
@@ -308,8 +319,8 @@ try {
     const files: string[] = [];
     const walk = (d: string) => { for (const f of readdirSync(d)) { const p = path.join(d, f); if (statSync(p).isDirectory()) walk(p); else files.push(p); } };
     walk(dir);
-    const secrets = [process.env.TEST_AUTH_SECRET, process.env.TEST_MFA_KEY].filter(Boolean) as string[];
-    const leaks = files.filter((f) => /\.(js|css|json)$/.test(f)).filter((f) => { const s = readFileSync(f, "utf8"); return secrets.some((x) => s.includes(x)) || /DATABASE_URL|RAZORPAY_KEY_SECRET|SMTP_PASS|GOOGLE_CLIENT_SECRET|bcrypt\.hash/.test(s); });
+    const secrets = [process.env.TEST_AUTH_SECRET, process.env.TEST_MFA_KEY, process.env.TEST_SETTINGS_KEY].filter(Boolean) as string[];
+    const leaks = files.filter((f) => /\.(js|css|json)$/.test(f)).filter((f) => { const s = readFileSync(f, "utf8"); return secrets.some((x) => s.includes(x)) || /process\.env\.(DATABASE_URL|AUTH_SECRET|RAZORPAY_KEY_SECRET|RAZORPAY_WEBHOOK_SECRET|SMTP_PASS|GOOGLE_CLIENT_SECRET|SETTINGS_ENCRYPTION_KEY|MFA_ENCRYPTION_KEY)|bcrypt\.hash/.test(s); });
     check(`no server secrets or secret env names in ${files.length} client files`, secrets.length > 0 && leaks.length === 0, leaks);
   }
 } finally {

@@ -1,7 +1,8 @@
 import { db } from "@/lib/db";
 import { ApiError, assertBodySize, baseUrl, handle, json } from "@/lib/api";
 import { requireUser } from "@/lib/session";
-import { getPlan } from "@/lib/plans";
+import { planForUser } from "@/lib/plan-store";
+import { assertStorageQuota, withQuota } from "@/lib/entitlements";
 import { rateLimit } from "@/lib/rate-limit";
 import { ALLOWED_UPLOADS, deleteStoredFile, sniffOk, storeFile } from "@/lib/storage";
 
@@ -16,11 +17,12 @@ export const POST = handle(async (req) => {
   const user = await requireUser();
   await rateLimit(`upload:${user.id}`, 30, 60 * 60 * 1000);
   // Reject oversized bodies before buffering them in memory.
-  assertBodySize(req, getPlan(user.plan).uploadMb * 1024 * 1024 + 64 * 1024);
+  const plan = await planForUser(user);
+  assertBodySize(req, plan.limits.uploadMb * 1024 * 1024 + 64 * 1024);
   const form = await req.formData().catch(() => null);
   const file = form?.get("file");
   if (!(file instanceof File)) throw new ApiError(400, "No file received.");
-  const limitMb = getPlan(user.plan).uploadMb;
+  const limitMb = plan.limits.uploadMb;
   if (file.size > limitMb * 1024 * 1024) throw new ApiError(413, `File is larger than your plan's ${limitMb} MB limit.`);
   if (file.size === 0) throw new ApiError(400, "File is empty.");
   const ext = (file.name.split(".").pop() || "").toLowerCase();
@@ -28,9 +30,11 @@ export const POST = handle(async (req) => {
   const buf = Buffer.from(await file.arrayBuffer());
   if (!sniffOk(ext, buf)) throw new ApiError(415, "The file content doesn't match its extension.");
   const storedName = await storeFile(ext, buf);
-  const upload = await db.upload.create({
-    data: { userId: user.id, filename: file.name.slice(0, 200), storedName, mime: ALLOWED_UPLOADS[ext].mime, size: file.size },
-  });
+  // Storage quota + insert are atomic; the stored file is removed if the quota check fails.
+  const upload = await withQuota(user.id, async (tx) => {
+    await assertStorageQuota(tx, user.id, plan, file.size);
+    return tx.upload.create({ data: { userId: user.id, filename: file.name.slice(0, 200), storedName, mime: ALLOWED_UPLOADS[ext].mime, size: file.size } });
+  }).catch(async (e) => { await deleteStoredFile(storedName); throw e; });
   return json({ item: { ...upload, url: `${baseUrl(req)}/f/${storedName}` } }, 201);
 });
 

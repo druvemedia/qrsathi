@@ -1,0 +1,24 @@
+@startuml
+' Figure 4.26 (PlantUML source). Production nodes are RECOMMENDED, not verified as deployed.
+node "Developer workstation" {
+  component "next dev :3000" as DEV
+  database "SQLite prisma/dev.db" as SQ
+  folder "uploads/" as UPD
+}
+DEV --> SQ
+DEV --> UPD
+node "Production server (recommended)" {
+  component "Reverse proxy (TLS)" as RP
+  component "next start (Node 22)" as APP
+  folder "UPLOAD_DIR volume" as VOL
+}
+database "MySQL 8 (recommended)" as MY
+cloud "Razorpay / Google / SMTP" as EXT
+actor "Internet user" as USR
+USR --> RP
+RP --> APP
+APP --> MY
+APP --> VOL
+APP ..> EXT
+EXT ..> RP : webhook
+@enduml

@@ -33,7 +33,8 @@
     "test:security": "tsx scripts/test-security.mts",
     "license:check": "node scripts/license-report.mjs",
     "test:admin": "tsx scripts/test-admin.mts",
-    "audit:check": "node scripts/audit-check.mjs"
+    "audit:check": "node scripts/audit-check.mjs",
+    "test:billing": "tsx scripts/test-billing.mts"
   },
   "prisma": {
     "schema": "prisma/schema.prisma"

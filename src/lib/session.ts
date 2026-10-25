@@ -17,7 +17,7 @@ import { SignJWT, jwtVerify } from "jose";
 import type { Session, User } from "@prisma/client";
 import { db } from "./db";
 import { ApiError } from "./api";
-import { getPlan } from "./plans";
+import { planById } from "./plan-store";
 import { isAdminRole, isSuperAdmin } from "./roles";
 
 export const SESSION_COOKIE = "qs_session";
@@ -148,8 +148,22 @@ export async function requireAdmin(opts: { superAdmin?: boolean; allowWithoutMfa
   return a.user;
 }
 
-export function publicUser(u: User) {
-  const plan = getPlan(u.plan);
+/** Browser-safe user view. Includes the plan's entitlements so the UI can explain limits (the server still enforces them). */
+/**
+ * Sensitive admin actions (payment credentials, enabling live billing) need a
+ * recent sign-in or re-confirmation (POST /api/admin/auth/reauth), not just a
+ * valid session. Returns the admin user.
+ */
+export async function requireRecentAdminAuth(opts: { superAdmin?: boolean; maxAgeMs?: number } = {}) {
+  const user = await requireAdmin({ superAdmin: opts.superAdmin });
+  const a = await getAdmin();
+  const last = Math.max(a!.session.createdAt.getTime(), a!.session.reauthAt?.getTime() ?? 0);
+  if (Date.now() - last > (opts.maxAgeMs ?? 15 * 60_000)) throw new ApiError(403, "Please confirm your password to continue.", { reauthRequired: true });
+  return { user, session: a!.session };
+}
+
+export async function publicUser(u: User) {
+  const plan = await planById(u.plan);
   return {
     id: u.id,
     email: u.email,
@@ -157,6 +171,7 @@ export function publicUser(u: User) {
     role: u.role,
     plan: plan.id,
     planName: plan.name,
+    limits: plan.limits,
     planExpiresAt: u.planExpiresAt,
     hasPassword: !!u.passwordHash,
     google: !!u.googleId,
@@ -164,4 +179,4 @@ export function publicUser(u: User) {
     createdAt: u.createdAt,
   };
 }
-export type PublicUser = ReturnType<typeof publicUser>;
+export type PublicUser = Awaited<ReturnType<typeof publicUser>>;

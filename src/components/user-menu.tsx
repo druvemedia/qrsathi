@@ -62,7 +62,7 @@ export function UserMenu() {
         <span className="hidden max-w-[120px] truncate text-sm font-medium sm:block">{user.name || user.email}</span>
       </button>
       {open && (
-        <div role="menu" className="card absolute right-0 top-11 z-50 w-60 animate-scale-in p-1.5 shadow-pop">
+        <div role="menu" className="card absolute right-0 top-11 z-50 w-60 origin-top-right animate-dropdown-in p-1.5 shadow-pop">
           <div className="px-3 py-2">
             <p className="truncate text-sm font-semibold">{user.name}</p>
             <p className="truncate text-xs text-slate-500">{user.email}</p>

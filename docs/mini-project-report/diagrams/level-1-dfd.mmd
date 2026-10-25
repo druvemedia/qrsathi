@@ -1,0 +1,40 @@
+%% Figure 4.4: Level-1 data-flow diagram
+flowchart TB
+  U["User"]
+  V["Visitor"]
+  A["Administrator"]
+  R["Razorpay"]
+  P1(("1.0<br/>Authenticate &<br/>manage sessions"))
+  P2(("2.0<br/>Create & manage<br/>QR codes"))
+  P3(("3.0<br/>Resolve dynamic<br/>QR & record scan"))
+  P4(("4.0<br/>Manage products,<br/>barcodes & stock"))
+  P5(("5.0<br/>Billing &<br/>subscriptions"))
+  P6(("6.0<br/>Administration &<br/>configuration"))
+  D1[("D1 User / Session /<br/>MfaRecoveryCode")]
+  D2[("D2 QrCode")]
+  D3[("D3 Scan")]
+  D4[("D4 Product / Barcode /<br/>InventoryTransaction")]
+  D5[("D5 Subscription / Payment /<br/>WebhookEvent / PricingPlan")]
+  D6[("D6 Setting / BrandAsset /<br/>AuditLog / Log")]
+  U -->|email, password| P1
+  P1 <-->|user, session rows| D1
+  P1 -->|session cookie| U
+  U -->|type, content, design| P2
+  P2 -->|plan limits| D5
+  P2 <-->|QR rows| D2
+  V -->|/r/code| P3
+  P3 -->|lookup| D2
+  P3 -->|scan row| D3
+  P3 -->|redirect| V
+  U -->|product, barcode, stock movement| P4
+  P4 <--> D4
+  U -->|plan, interval| P5
+  P5 <--> D5
+  P5 <-->|subscriptions, payments| R
+  P5 -->|plan upgrade| D1
+  A -->|actions| P6
+  P6 <--> D1
+  P6 <--> D2
+  P6 <--> D6
+  P6 <--> D5
+  P1 -->|audit events| D6

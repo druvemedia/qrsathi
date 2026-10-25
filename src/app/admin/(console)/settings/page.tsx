@@ -4,13 +4,13 @@ import { PageHeader } from "@/components/ui";
 import { requirePageAdmin } from "@/lib/guard";
 import { SettingsView } from "./settings-view";
 
-export const metadata: Metadata = { title: "Site settings" };
+export const metadata: Metadata = { title: "General settings" };
 
 export default async function AdminSettingsPage() {
   await requirePageAdmin("/admin/settings");
   return (
     <>
-      <PageHeader icon={<Settings />} title="Site settings" description="Branding, sign-up policy and the site-wide announcement. Integrations are configured with environment variables (see System)." />
+      <PageHeader icon={<Settings />} title="General settings" description="Sign-up policy and the site-wide announcement." />
       <SettingsView />
     </>
   );

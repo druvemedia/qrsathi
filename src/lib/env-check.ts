@@ -37,6 +37,12 @@ export function checkEnv(env: Record<string, string | undefined>) {
   if (prod && env.RATE_LIMIT_STORE !== "database") warnings.push("RATE_LIMIT_STORE is 'memory': limits reset on restart and aren't shared between instances. Use 'database' when running more than one instance.");
   if (env.TRUST_PROXY && !["true", "cloudflare"].includes(env.TRUST_PROXY)) errors.push("TRUST_PROXY must be 'true', 'cloudflare' or unset.");
   if (!!env.RAZORPAY_KEY_ID !== !!env.RAZORPAY_KEY_SECRET) warnings.push("Set both RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET (or neither).");
+  if (env.RAZORPAY_KEY_ID && !/^rzp_(test|live)_[A-Za-z0-9]{8,32}$/.test(env.RAZORPAY_KEY_ID)) errors.push("RAZORPAY_KEY_ID must look like rzp_test_… or rzp_live_….");
+  if (env.SETTINGS_ENCRYPTION_KEY) {
+    if (env.SETTINGS_ENCRYPTION_KEY.length < 32) errors.push("SETTINGS_ENCRYPTION_KEY must be at least 32 characters.");
+    else if (env.SETTINGS_ENCRYPTION_KEY === env.AUTH_SECRET) errors.push("SETTINGS_ENCRYPTION_KEY must be different from AUTH_SECRET.");
+  }
+  if (prod && env.RAZORPAY_API_BASE && !/^https:\/\/api\.razorpay\.com\/?$/.test(env.RAZORPAY_API_BASE)) warnings.push("RAZORPAY_API_BASE overrides the Razorpay API address. It exists for automated tests only — unset it in production.");
   if (env.RAZORPAY_KEY_ID && !env.RAZORPAY_WEBHOOK_SECRET) (prod ? errors : warnings).push("RAZORPAY_WEBHOOK_SECRET is required when Razorpay is enabled (plans are upgraded only by the signed webhook).");
   if (!!env.GOOGLE_CLIENT_ID !== !!env.GOOGLE_CLIENT_SECRET) warnings.push("Set both GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET (or neither).");
   if (prod && !env.SMTP_HOST) warnings.push("SMTP is not configured: password-reset e-mails can't be delivered.");

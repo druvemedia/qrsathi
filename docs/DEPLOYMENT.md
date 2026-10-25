@@ -42,6 +42,7 @@ Warnings, for example about the in-memory rate-limit store, are logged at startu
 | `AUTH_SECRET` | 48+ random bytes: `node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))"` |
 | `NEXT_PUBLIC_APP_URL` | `https://your-domain`, the origin only. **Inlined at build time:** rebuild after changing it. |
 | `MFA_ENCRYPTION_KEY` | Recommended. A separate 32+ char key for administrator TOTP secrets. |
+| `SETTINGS_ENCRYPTION_KEY` | Only if admins should enter Razorpay credentials in the console (they're stored AES-GCM-encrypted). 32+ chars, different from `AUTH_SECRET`, kept only in the environment. Leave unset to manage credentials with `RAZORPAY_*` variables. |
 | `TRUST_PROXY` | `true` behind nginx/Caddy/a load balancer; `cloudflare` behind Cloudflare. |
 | `RATE_LIMIT_STORE` | `database` when running more than one instance. |
 | `UPLOAD_DIR` | Absolute path on persistent storage. |
@@ -158,21 +159,29 @@ Set `SMTP_HOST`, `SMTP_PORT` (587 STARTTLS / 465 TLS), `SMTP_USER`, `SMTP_PASS` 
 
 Only Google accounts with verified e-mail addresses are accepted. Google sign-in always creates ordinary users.
 
-### Razorpay
-1. Set `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET` and `RAZORPAY_WEBHOOK_SECRET`.
-2. Razorpay Dashboard → Webhooks: URL `https://your-domain/api/billing/webhook`, event **`payment_link.paid`**, secret = `RAZORPAY_WEBHOOK_SECRET`.
-3. Plans are upgraded **only** by a webhook with a valid HMAC signature for a fully paid link. Test in Razorpay test mode first.
+### Razorpay (subscriptions)
+1. Set `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET` and `RAZORPAY_WEBHOOK_SECRET`, or enter them under **Payment gateway** in the admin console (this needs `SETTINGS_ENCRYPTION_KEY`).
+2. Razorpay Dashboard → Webhooks: URL `https://your-domain/api/billing/webhook`, with the secret you chose. Select the `subscription.*` events, `payment.failed` and `refund.processed`.
+3. In the console:
+   - **Test connection** (read-only);
+   - sync each paid plan under **Plans & pricing**;
+   - enable checkout.
+4. Plans change only after Razorpay confirms a captured payment, through the API check or a signed webhook.
+
+Complete the go-live checklist in [BILLING.md](BILLING.md) before switching to live keys. Never set `RAZORPAY_API_BASE` in production: it exists only for the test mock.
 
 ## 8. Multiple instances
 
 - Set `RATE_LIMIT_STORE=database`, so rate limits are shared through MySQL.
 - Put `UPLOAD_DIR` on shared storage (NFS/EFS). Alternatively, replace `storeFile`, `readStoredFile` and `deleteStoredFile` in `src/lib/storage.ts` with object storage.
-- Use one `AUTH_SECRET` and one `MFA_ENCRYPTION_KEY` across all instances.
+- Use one `AUTH_SECRET`, `MFA_ENCRYPTION_KEY` and `SETTINGS_ENCRYPTION_KEY` across all instances.
 
 ## 9. Production checklist
 
 - [ ] HTTPS only; HTTP redirects to HTTPS; `NEXT_PUBLIC_APP_URL` is the final https origin.
-- [ ] `AUTH_SECRET` and `MFA_ENCRYPTION_KEY` are unique random values, stored only in the server's secret store or `.env` (mode 600). Not in git.
+- [ ] `AUTH_SECRET`, `MFA_ENCRYPTION_KEY` and (if used) `SETTINGS_ENCRYPTION_KEY` are unique random values, stored only in the server's secret store or `.env` (mode 600). Not in git, never in the database.
+- [ ] Razorpay go-live checklist completed ([BILLING.md](BILLING.md)); `RAZORPAY_API_BASE` is unset.
+- [ ] Branding published: site title, support e-mail, favicon, social image (`/admin/settings/branding`).
 - [ ] `DEMO_MODE` is unset or `false`; no demo accounts exist (`npm run admin -- list`).
 - [ ] A super administrator exists and has enrolled in 2FA; recovery codes are stored safely.
 - [ ] MySQL user has only the privileges it needs; TLS to remote databases; database not publicly reachable.

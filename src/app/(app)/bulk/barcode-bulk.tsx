@@ -7,7 +7,7 @@ import { BARCODE_MAP, getBarcodeFormat, renderBarcodeSvg, renderLabelSvg, valida
 import { buildZip, downloadBlob, svgBlob, svgToPngBlob } from "@/lib/qr-export";
 import { labelsPdf, mmToPx, printLabels } from "@/lib/barcode-export";
 import { parseTableFile, toCsv } from "@/lib/table-file";
-import { GUEST_BULK_ROWS, getPlan } from "@/lib/plans";
+import { GUEST_BULK_ROWS } from "@/lib/plans";
 import { safeFilename, cn } from "@/lib/utils";
 import { Alert, Badge, Button, Card, Field, Segmented, Select, Stepper } from "@/components/ui";
 import { useApp } from "@/components/providers";
@@ -20,7 +20,7 @@ interface Row { index: number; filename: string; value?: string; error?: string;
 
 export function BarcodeBulk() {
   const { user } = useApp();
-  const limit = user ? getPlan(user.plan).bulkRows : GUEST_BULK_ROWS;
+  const limit = user ? user.limits.bulkRows : GUEST_BULK_ROWS;
   const [format, setFormat] = useState("code128");
   const [headers, setHeaders] = useState<string[]>([]);
   const [rows, setRows] = useState<string[][]>([]);

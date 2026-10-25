@@ -205,7 +205,7 @@ try {
   // ---------- 3. responsive layout ----------
   console.log("\n# Responsive layout (no horizontal page overflow)");
   const shotDir = process.env.SHOT_DIR;
-  const publicPages = ["/", "/generator", "/barcodes", "/scanner", "/scan-history", "/bulk", "/upi", "/pricing", "/help", "/login", "/signup", "/forgot-password", "/admin/login", "/admin/forgot-password"];
+  const publicPages = ["/", "/features", "/tools", "/about", "/contact", "/generator", "/barcodes", "/scanner", "/scan-history", "/bulk", "/upi", "/pricing", "/help", "/login", "/signup", "/forgot-password", "/admin/login", "/admin/forgot-password"];
   const privatePages = ["/dashboard", "/codes", "/products", "/products/new", "/inventory", "/analytics", "/dynamic", "/dashboard/settings", "/studio"];
   const rpage = await openPage(`${BASE}/login`, [], "responsive");
   const email = `ui-${Date.now()}@example.com`;
@@ -281,8 +281,10 @@ try {
         check("admin signs in through the /admin/login form and returns to ?next", landed === "/admin/users", landed);
         const pages: [string, string][] = [
           ["/admin", "Platform overview"], ["/admin/users", "All accounts"], ["/admin/qr-codes", "Dynamic & hosted codes"], ["/admin/reports", "Reports"],
-          ["/admin/products", "Barcodes by format"], ["/admin/analytics", "Platform analytics"], ["/admin/subscriptions", "Paid accounts"], ["/admin/payments", "Payment records"],
-          ["/admin/security", "Audit log"], ["/admin/settings", "Branding"], ["/admin/system", "Configuration"], ["/admin/mfa", "Set up authenticator app"],
+          ["/admin/products", "Barcodes by format"], ["/admin/analytics", "Platform analytics"], ["/admin/subscriptions", "Accounts per plan"], ["/admin/payments", "Payment history"],
+          ["/admin/security", "Audit log"], ["/admin/settings", "Site behaviour"], ["/admin/system", "Configuration"], ["/admin/mfa", "Set up authenticator app"],
+          ["/admin/barcodes", "Barcodes by format"], ["/admin/settings/branding", "Site identity"], ["/admin/settings/appearance", "Colours"], ["/admin/settings/payments", "Razorpay checkout"],
+          ["/admin/settings/pricing", "Preview"], ["/admin/settings/email", "SMTP"], ["/admin/security/events", "Security events"], ["/admin/security/admins", "Administrator accounts"],
         ];
         for (const w of [375, 768, 1280]) for (const [p, t] of pages) await visit(p, w, t);
         const nav = String(await rpage.eval("document.body.innerText"));

@@ -48,8 +48,9 @@ export function SystemView() {
                   ["Dedicated MFA_ENCRYPTION_KEY", s.config.mfaKeySet, undefined],
                   ["E-mail (SMTP)", s.config.smtp, undefined],
                   ["Google sign-in", s.config.google, undefined],
-                  ["Razorpay billing", s.config.razorpay, undefined],
-                  ["Razorpay webhook secret", s.config.razorpayWebhook, s.config.razorpay ? false : undefined],
+                  [`Razorpay checkout (${s.config.razorpayMode} mode)`, s.config.razorpay, undefined],
+                  ["Razorpay webhook secret (active mode)", s.config.razorpayWebhook, s.config.razorpay ? false : undefined],
+                  ["SETTINGS_ENCRYPTION_KEY (DB-stored credentials)", s.config.settingsKeySet, undefined],
                   ["Demo mode", s.config.demoMode, true],
                 ] as [string, boolean, boolean | undefined][]).map(([k, v, w]) => (
                   <li key={k} className="flex items-center justify-between gap-3"><span>{k}</span><OnOff on={v} warnWhen={w} /></li>

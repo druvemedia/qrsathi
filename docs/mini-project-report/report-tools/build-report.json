@@ -1,0 +1,49 @@
+{
+  "built": "2026-10-25T13:46:54.085Z",
+  "pdf": {
+    "pages": 157,
+    "nCover": 2,
+    "nFront": 16,
+    "nBody": 139,
+    "located": 307
+  },
+  "docx": {
+    "chapters": [
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true
+    ],
+    "appendices": [
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true
+    ],
+    "characters": 254938
+  },
+  "counts": {
+    "headings": 178,
+    "figures": 51,
+    "tables": 56,
+    "testcases": 91,
+    "requirements": 35,
+    "apiRoutes": 67
+  },
+  "standalone": [
+    "QRSathi_API_Documentation.md",
+    "QRSathi_Database_Design.md",
+    "QRSathi_Installation_and_User_Guide.md",
+    "QRSathi_Project_Audit.md",
+    "QRSathi_Test_Report.md",
+    "README.md"
+  ]
+}

@@ -1,15 +1,21 @@
-/** Client-safe branding constants (no server imports). */
+/** Client-safe site settings shape (no server imports). */
+import type { Branding } from "./branding";
+
 export interface SiteSettings {
+  /** Published brand name (alias of branding.brandName, kept for existing components). */
   siteName: string;
+  /** Short description (alias of branding.shortDescription). */
   tagline: string;
-  brand: string; // key of BRAND_COLORS
+  /** Legacy colour preset key; colours now come from branding.primaryColor. */
+  brand: string;
   announcement: string;
   allowSignups: boolean;
   supportEmail: string;
   companyName: string;
+  branding: Branding;
 }
 
-/** HSL triplets used for the --brand / --accent CSS variables. */
+/** Legacy HSL presets (pre-branding installs stored one of these keys). */
 export const BRAND_COLORS: Record<string, { label: string; hsl: string; accent: string }> = {
   indigo: { label: "Indigo", hsl: "243 75% 59%", accent: "262 83% 58%" },
   violet: { label: "Violet", hsl: "262 83% 58%", accent: "199 89% 48%" },

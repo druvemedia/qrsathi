@@ -1,6 +1,6 @@
-// QRSathi database schema.
-// SQLite is used for zero-config local development. For production switch the
-// provider to "postgresql" and point DATABASE_URL at your Postgres/Supabase DB.
+// QRSathi database schema (canonical).
+// SQLite for local development. Production uses MySQL through the generated
+// prisma/mysql/schema.prisma (npm run db:mysql:schema) — see docs/DATABASE.md.
 
 generator client {
   provider = "prisma-client-js"
@@ -29,7 +29,9 @@ model User {
   mfaSecret      String?
   mfaEnabledAt   DateTime?
   mfaLastStep    Int             @default(0) // last accepted TOTP time-step (replay protection)
+  quotaLock      Int             @default(0) // bumped inside quota transactions to serialise concurrent creates per user
   sessions       Session[]
+  subscriptions  Subscription[]
   recoveryCodes  MfaRecoveryCode[]
   qrCodes        QrCode[]
   downloads      Download[]
@@ -129,17 +131,122 @@ model AbuseReport {
   createdAt     DateTime @default(now())
 }
 
+/// One money movement. Amount, currency and plan are snapshots taken when the
+/// payment happened — later plan or price edits never rewrite history.
 model Payment {
+  id                String        @id @default(cuid())
+  userId            String
+  provider          String // razorpay
+  providerRef       String        @unique // payment link id (legacy) or razorpay payment id
+  kind              String        @default("payment_link") // payment_link | subscription
+  plan              String // plan id snapshot
+  planName          String        @default("") // display-name snapshot
+  interval          String        @default("") // month | year | "" (30-day pass)
+  amount            Int // minor units (paise)
+  currency          String        @default("INR")
+  status            String        @default("created") // created | pending | paid | failed | expired | refunded | partially_refunded
+  refundedAmount    Int           @default(0)
+  failureReason     String        @default("")
+  subscriptionId    String?
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+  user              User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  subscription      Subscription? @relation(fields: [subscriptionId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt])
+  @@index([subscriptionId])
+}
+
+// ---------- Pricing, subscriptions, webhooks ----------
+
+/// Admin-managed plan definition (catalogue). Entitlements live in `limits` (JSON).
+/// Plans are archived, never deleted, so history and existing subscribers keep a reference.
+model PricingPlan {
+  id                String         @id // internal identifier, e.g. "pro"
+  name              String
+  description       String         @default("")
+  currency          String         @default("INR")
+  monthlyPrice      Int            @default(0) // minor units; 0 = not offered monthly (paid plans)
+  annualPrice       Int            @default(0) // minor units per year; 0 = not offered yearly
+  features          String         @default("[]") // JSON string[] shown on pricing cards
+  limits            String         @default("{}") // JSON entitlements (see src/lib/plans.ts)
+  featured          Boolean        @default(false)
+  status            String         @default("draft") // draft | published | archived
+  sortOrder         Int            @default(0)
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+  providerPlans     ProviderPlan[]
+}
+
+/// A Razorpay plan created for one (plan, interval, price, currency, mode).
+/// Price changes create a new provider plan; existing subscriptions keep theirs.
+model ProviderPlan {
+  id             String      @id @default(cuid())
+  planId         String
+  interval       String // month | year
+  amount         Int // minor units
+  currency       String
+  mode           String // test | live
+  providerPlanId String      @unique
+  active         Boolean     @default(true) // used for new checkouts
+  createdAt      DateTime    @default(now())
+  plan           PricingPlan @relation(fields: [planId], references: [id], onDelete: Restrict)
+
+  @@index([planId, interval, mode, active])
+}
+
+/// Customer subscription (Razorpay Subscriptions). Status mirrors the provider and
+/// changes only from verified server-side confirmations (API fetch or signed webhook).
+model Subscription {
+  id                     String    @id @default(cuid())
+  userId                 String
+  planId                 String // PricingPlan id snapshot
+  planName               String    @default("")
+  interval               String // month | year
+  amount                 Int // minor units per period (snapshot)
+  currency               String    @default("INR")
+  provider               String    @default("razorpay")
+  mode                   String    @default("test") // test | live
+  providerSubscriptionId String    @unique
+  providerPlanId         String
+  status                 String    @default("created") // created | authenticated | active | pending | halted | cancelled | completed | expired
+  currentPeriodEnd       DateTime?
+  cancelAtPeriodEnd      Boolean   @default(false)
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
+  user                   User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  payments               Payment[]
+
+  @@index([userId, status])
+}
+
+/// Ledger of processed provider webhooks. The unique key makes duplicate deliveries no-ops.
+model WebhookEvent {
   id          String   @id @default(cuid())
-  userId      String
-  provider    String // razorpay
-  providerRef String   @unique // payment link id
-  plan        String
-  amount      Int // in paise
-  status      String   @default("created") // created | paid | failed | expired
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  provider    String
+  eventId     String
+  eventType   String
+  status      String   @default("processed") // processed | ignored | rejected
+  summary     String   @default("") // short redacted description, never the raw payload
+  receivedAt  DateTime @default(now())
+
+  @@unique([provider, eventId])
+  @@index([receivedAt])
+}
+
+/// Uploaded branding image (logo, favicon, social image). Served from /brand/[name].
+model BrandAsset {
+  id         String   @id @default(cuid())
+  kind       String // logo | logoDark | favicon | ogImage
+  storedName String   @unique
+  mime       String
+  width      Int      @default(0)
+  height     Int      @default(0)
+  size       Int
+  createdBy  String   @default("")
+  createdAt  DateTime @default(now())
+
+  @@index([kind, createdAt])
 }
 
 model Log {
@@ -237,6 +344,7 @@ model Session {
   createdAt  DateTime @default(now())
   expiresAt  DateTime
   lastSeenAt DateTime @default(now())
+  reauthAt   DateTime? // last password(+MFA) re-confirmation, for sensitive admin actions
   userAgent  String   @default("")
   user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 

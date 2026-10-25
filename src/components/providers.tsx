@@ -21,12 +21,13 @@ interface AppCtx {
 
 const Ctx = createContext<AppCtx | null>(null);
 
-function readPref(): ThemePref {
+/** The visitor's saved choice, else the site default configured in Appearance. */
+function readPref(fallback: ThemePref): ThemePref {
   try {
     const t = localStorage.getItem("theme");
-    return t === "light" || t === "dark" ? t : "system";
+    return t === "light" || t === "dark" || t === "system" ? t : fallback;
   } catch {
-    return "system";
+    return fallback;
   }
 }
 
@@ -37,8 +38,8 @@ export function Providers({ children, user: initial, settings }: { children: Rea
 
   // Apply the preference and keep "system" in sync with the OS.
   useEffect(() => {
-    setPref(readPref());
-  }, []);
+    setPref(readPref(settings.branding.defaultTheme));
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     const mq = window.matchMedia("(prefers-color-scheme: dark)");
     const apply = () => {
@@ -54,8 +55,7 @@ export function Providers({ children, user: initial, settings }: { children: Rea
   const setThemePref = useCallback((t: ThemePref) => {
     setPref(t);
     try {
-      if (t === "system") localStorage.removeItem("theme");
-      else localStorage.setItem("theme", t);
+      localStorage.setItem("theme", t);
     } catch {}
   }, []);
   const toggleTheme = useCallback(() => setThemePref(theme === "dark" ? "light" : "dark"), [theme, setThemePref]);

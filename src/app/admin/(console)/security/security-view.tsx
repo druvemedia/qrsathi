@@ -15,7 +15,9 @@ function Details({ raw }: { raw: string }) {
   return <code className="block max-w-[320px] truncate text-[11px] text-slate-500" title={raw}>{raw}</code>;
 }
 
-export function SecurityView({ initialCategory }: { initialCategory: string }) {
+export type SecurityMode = "audit" | "events" | "admins";
+
+export function SecurityView({ initialCategory, mode = "audit" }: { initialCategory: string; mode?: SecurityMode }) {
   const list = useListQuery("/api/admin/security", { filters: { category: initialCategory } });
   const { data, loading, error, reload } = useAdminData<Resp>(list.url);
   const s = data?.summary;
@@ -32,7 +34,7 @@ export function SecurityView({ initialCategory }: { initialCategory: string }) {
 
   return (
     <div className="space-y-6">
-      {s && (
+      {s && mode !== "audit" && (
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
           <StatCard label="Failed sign-ins (24 h)" value={fmtNum(s.failed24h)} icon={<ShieldX />} tone={s.failed24h > 20 ? "warn" : undefined} />
           <StatCard label="Failed 2FA codes (24 h)" value={fmtNum(s.mfaFailed24h)} icon={<ShieldAlert />} tone={s.mfaFailed24h > 5 ? "warn" : undefined} />
@@ -41,7 +43,7 @@ export function SecurityView({ initialCategory }: { initialCategory: string }) {
         </div>
       )}
 
-      {s && (
+      {s && mode === "admins" && (
         <Section title="Administrator accounts" description="Roles are granted only by a super administrator or the server-side admin CLI.">
           <ul className="divide-y divide-slate-100 text-sm dark:divide-slate-800">
             {s.admins.map((a) => (
@@ -59,7 +61,7 @@ export function SecurityView({ initialCategory }: { initialCategory: string }) {
         </Section>
       )}
 
-      <Section title="Audit log" description={data ? `${fmtNum(data.total)} events` : undefined}>
+      {mode !== "admins" && <Section title={mode === "events" ? "Security events" : "Audit log"} description={data ? `${fmtNum(data.total)} events` : undefined}>
         <FilterBar>
           <Segmented size="sm" value={list.state.filters.category || ""} onChange={(v) => list.setFilter("category", v)}
             options={[{ value: "", label: "All" }, { value: "admin", label: "Admin actions" }, { value: "auth", label: "Sign-in" }, { value: "failures", label: "Failures" }]} />
@@ -69,7 +71,7 @@ export function SecurityView({ initialCategory }: { initialCategory: string }) {
           <DataTable caption="Audit log" columns={columns} data={data?.items} loading={loading} error={error} onRetry={reload} empty={{ title: "No events match" }} />
           {data && <Pagination page={data.page} pages={data.pages} total={data.total} pageSize={data.pageSize} onPage={list.setPage} onPageSize={list.setPageSize} />}
         </div>
-      </Section>
+      </Section>}
     </div>
   );
 }

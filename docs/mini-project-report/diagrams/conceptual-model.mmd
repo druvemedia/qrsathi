@@ -1,0 +1,34 @@
+%% Figure 4.14: Conceptual data model (entity groups)
+flowchart LR
+  subgraph Identity["Identity & security"]
+    U[User] --- S[Session]
+    U --- R[MfaRecoveryCode]
+    U --- PRS[PasswordReset]
+    AL[AuditLog]
+    RL[RateLimit]
+  end
+  subgraph QR["QR codes & analytics"]
+    Q[QrCode] --- SC[Scan]
+    Q --- DL[Download]
+    UP[Upload]
+    AR[AbuseReport]
+  end
+  subgraph INV["Products & inventory"]
+    P[Product] --- B[Barcode]
+    P --- IT[InventoryTransaction]
+  end
+  subgraph BILL["Billing"]
+    PP[PricingPlan] --- PV[ProviderPlan]
+    SB[Subscription] --- PM[Payment]
+    WE[WebhookEvent]
+  end
+  subgraph CFG["Configuration & logs"]
+    ST[Setting]
+    BA[BrandAsset]
+    LG[Log]
+  end
+  U --- Q
+  U --- UP
+  U --- P
+  U --- SB
+  U --- PM

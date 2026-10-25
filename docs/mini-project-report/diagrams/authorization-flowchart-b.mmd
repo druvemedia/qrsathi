@@ -1,0 +1,13 @@
+%% Figure 4.7(b): Flowchart: request authorization, part (b) — administrator guard
+flowchart TD
+  S([requireAdmin]) --> A1{qs_admin valid, admin role,<br/>idle under 2 h?}
+  A1 -- No --> F401A[401 administrator sign-in]
+  A1 -- Yes --> A2{MFA enabled but session<br/>not MFA-verified?}
+  A2 -- Yes --> F401A
+  A2 -- No --> A3{Super admin<br/>without MFA?}
+  A3 -- Yes --> F403M[403 enable 2FA]
+  A3 -- No --> A4{Endpoint requires<br/>super admin?}
+  A4 -- Yes, role is admin --> F403S[403 super admin required]
+  A4 -- No / satisfied --> A5{Sensitive action:<br/>re-auth older than 15 min?}
+  A5 -- Yes --> F403R[403 reauth required]
+  A5 -- No --> OK([Execute admin action])

@@ -1,0 +1,33 @@
+%% Figure 4.22: Sequence diagram: database-backed product creation
+sequenceDiagram
+  autonumber
+  actor U as User
+  participant F as Product editor (client)
+  participant API as POST /api/products
+  participant P as lib/products.ts
+  participant BC as lib/barcodes.ts
+  participant E as lib/entitlements.ts
+  participant DB as Prisma + DB
+  U->>F: fill product form + barcodes
+  F->>API: JSON body
+  API->>API: requireUser()
+  API->>P: createProduct(user, body)
+  P->>P: productInput.safeParse
+  alt invalid
+    P-->>API: ApiError 400
+    API-->>F: 400 first validation message
+  end
+  P->>BC: validateBarcode + renderBarcodeSvg (each)
+  BC-->>P: normalised value, lookupKey
+  P->>DB: findFirst SKU / lookupKey for user
+  alt duplicate
+    P-->>API: ApiError 409
+    API-->>F: 409 already used by ...
+  end
+  P->>E: withQuota(userId)
+  E->>DB: lock quota row, count products / barcodes
+  E->>DB: INSERT Product + Barcodes + InventoryTransaction(created)
+  DB-->>P: product with barcodes
+  P-->>API: product
+  API->>DB: Log product.created
+  API-->>F: 201 {item}

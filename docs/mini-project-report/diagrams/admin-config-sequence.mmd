@@ -1,0 +1,32 @@
+%% Figure 4.23: Sequence diagram: super administrator saves payment-gateway credentials
+sequenceDiagram
+  autonumber
+  actor SA as Super admin
+  participant UI as /admin/settings/payments
+  participant API as /api/admin/payments/config
+  participant S as lib/session.ts
+  participant PC as lib/payment-config.ts
+  participant SB as lib/secret-box.ts
+  participant RZ as Razorpay API
+  participant DB as Prisma + DB
+  SA->>UI: enter Key ID, Key Secret, Webhook Secret
+  UI->>API: PUT {mode, keyId, keySecret, webhookSecret}
+  API->>S: requireRecentAdminAuth({superAdmin})
+  alt last sign-in or reauth older than 15 min
+    S-->>UI: 403 reauthRequired
+    SA->>UI: confirm password + TOTP
+    UI->>API: POST /api/admin/auth/reauth
+    API->>DB: Session.reauthAt = now
+    UI->>API: PUT again
+  end
+  API->>PC: saveCredentials(input)
+  PC->>SB: seal(secret, purpose) AES-256-GCM
+  PC->>DB: upsert Setting rows (ciphertext)
+  API->>DB: AuditLog credentials_updated (field names only)
+  API-->>UI: 200 status (no secrets returned)
+  SA->>UI: Test connection
+  UI->>API: POST {action: verify, mode}
+  API->>RZ: GET /v1/plans?count=1 (read-only)
+  RZ-->>API: 200 or 401
+  API->>DB: store verification status, AuditLog
+  API-->>UI: verified / invalid

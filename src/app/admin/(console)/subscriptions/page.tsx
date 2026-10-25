@@ -7,11 +7,11 @@ import { SubscriptionsView } from "./subscriptions-view";
 export const metadata: Metadata = { title: "Subscriptions" };
 
 export default async function AdminSubscriptionsPage() {
-  await requirePageAdmin("/admin/subscriptions");
+  const { user } = await requirePageAdmin("/admin/subscriptions");
   return (
     <>
-      <PageHeader icon={<CreditCard />} title="Subscriptions" description="Plan distribution and accounts on paid plans. Change an account's plan from Users." />
-      <SubscriptionsView />
+      <PageHeader icon={<CreditCard />} title="Subscriptions" description="Razorpay subscriptions, their status and renewal dates. Admin-assigned plans are changed from Users." />
+      <SubscriptionsView canManage={user.role === "super_admin"} />
     </>
   );
 }

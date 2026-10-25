@@ -7,7 +7,7 @@ import { toast } from "sonner";
 import { QR_TYPES, getType, validateContent, type FieldDef, type QrTypeDef } from "@/lib/qr-types";
 import { DEFAULT_DESIGN, renderQr, type QrDesign } from "@/lib/qr-render";
 import { buildPdf, buildZip, downloadBlob, exportSvg } from "@/lib/qr-export";
-import { GUEST_BULK_ROWS, getPlan } from "@/lib/plans";
+import { GUEST_BULK_ROWS } from "@/lib/plans";
 import { safeFilename, truncate, cn } from "@/lib/utils";
 import { Alert, Badge, Button, Card, Field, Input, Modal, Segmented, Select, Stepper } from "@/components/ui";
 import { useApp } from "@/components/providers";
@@ -53,7 +53,7 @@ interface Row {
 export function BulkTool() {
   const sp = useSearchParams();
   const { user } = useApp();
-  const limit = user ? getPlan(user.plan).bulkRows : GUEST_BULK_ROWS;
+  const limit = user ? user.limits.bulkRows : GUEST_BULK_ROWS;
   const [typeId, setTypeId] = useState(() => (BULK_TYPES.some((t) => t.id === sp.get("type")) ? sp.get("type")! : "url"));
   const type = getType(typeId);
   const [headers, setHeaders] = useState<string[]>([]);

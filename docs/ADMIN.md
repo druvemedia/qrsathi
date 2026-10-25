@@ -98,6 +98,27 @@ Use `/admin/forgot-password`. It's the same non-enumerating reset flow as custom
 
 MFA stays enabled after a reset. Afterwards, sign in again at `/admin/login`.
 
+## Website branding and appearance
+
+- **What's configured.** `/admin/settings/branding` covers the name, titles, title template, descriptions, SEO and social text, contact details, footer, favicon and social image. `/admin/settings/appearance` covers the brand and accent colours, the default theme, the header style and the logo variants for light and dark backgrounds.
+- **Draft workflow.** Edits are saved as a **draft** and shown in a live preview (light and dark). They reach the live site only when you **Publish**, which needs confirmation. You can also discard the draft, reset to the defaults (into the draft), or cancel unsaved edits. Leaving the page with unsaved changes asks for confirmation first.
+- **Publishing and metadata.** Published values drive the `<title>`, the meta description, Open Graph and Twitter cards, the favicon and the CSS colour variables, using the Next.js metadata API.
+- **Validation.** Text fields reject markup and control characters; colours must be `#rrggbb`. Button text automatically switches to black or white for contrast.
+- **Uploads.** PNG, JPEG, WebP or plain SVG, checked by:
+  - magic bytes and the dimensions read from the file header;
+  - size limits (logo 1 MB, favicon 256 KB and square, social image 2 MB);
+  - a strict SVG reject-list: no scripts, event handlers, external references or entities.
+
+  Files get new random names, so pages still using the old image keep working. Unused old uploads are cleaned up when you publish, keeping the five newest per kind. Images are served from `/brand/<name>` with a sandboxing CSP.
+- **Who can change it.** Any administrator, and every change is audited.
+
+## Plans, pricing and payments
+
+See [BILLING.md](BILLING.md).
+- Plans and prices are edited at `/admin/settings/pricing`.
+- The payment gateway is configured at `/admin/settings/payments`; credential changes need a password re-confirmation.
+- Both are super-admin actions; other administrators can view them.
+
 ## Audit log
 
 `/admin/security` shows sign-in failures, MFA events and every administrator action: who, what, target, when, and a hashed IP.

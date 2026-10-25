@@ -138,5 +138,110 @@ t("no TEXT column carries a literal default (MySQL rejects it)", !/@default\("[^
 t("committed prisma/mysql/schema.prisma is up to date", readFileSync("prisma/mysql/schema.prisma", "utf8").replace(/\r\n/g, "\n") === mysql);
 t("init migration applies binary collation to short codes", /MODIFY `shortCode` VARCHAR\(191\) NULL COLLATE utf8mb4_bin/.test(readFileSync("prisma/mysql/migrations/20261025000000_init/migration.sql", "utf8")));
 
+section("Credential encryption (secret-box)");
+{
+  const prev = process.env.SETTINGS_ENCRYPTION_KEY;
+  process.env.SETTINGS_ENCRYPTION_KEY = "unit-test-settings-key-0123456789abcdefghij";
+  const box = await import("../src/lib/secret-box");
+  const sealed = box.seal("rzp-secret-value-123", "razorpay.test.keySecret");
+  t("sealed value doesn't contain the plaintext", !sealed.includes("rzp-secret-value-123") && sealed.startsWith("sb1:"));
+  t("opens with the same purpose", box.open(sealed, "razorpay.test.keySecret") === "rzp-secret-value-123");
+  t("bound to its field (other purpose fails)", (() => { try { box.open(sealed, "razorpay.live.keySecret"); return false; } catch { return true; } })());
+  const p = sealed.split(":"); p[3] = Buffer.from(p[3], "base64url").map((b, i) => (i === 0 ? b ^ 1 : b)).toString("base64url");
+  t("tampering is detected", (() => { try { box.open(p.join(":"), "razorpay.test.keySecret"); return false; } catch { return true; } })());
+  process.env.SETTINGS_ENCRYPTION_KEY = "a-different-key-0123456789abcdefghijklmnop";
+  t("a different key can't decrypt", (() => { try { box.open(sealed, "razorpay.test.keySecret"); return false; } catch { return true; } })());
+  delete process.env.SETTINGS_ENCRYPTION_KEY;
+  t("no key → storage unavailable and sealing refuses", !box.settingsKeyAvailable() && (() => { try { box.seal("x", "y"); return false; } catch { return true; } })());
+  if (prev) process.env.SETTINGS_ENCRYPTION_KEY = prev;
+}
+
+section("Razorpay signatures");
+{
+  const rz = await import("../src/lib/razorpay");
+  const { createHmac } = await import("node:crypto");
+  const sig = createHmac("sha256", "key_secret_x").update("pay_123|sub_456").digest("hex");
+  t("valid checkout signature accepted", rz.verifySubscriptionSignature("pay_123", "sub_456", sig, "key_secret_x"));
+  t("signature for another subscription rejected", !rz.verifySubscriptionSignature("pay_123", "sub_999", sig, "key_secret_x"));
+  t("wrong secret rejected", !rz.verifySubscriptionSignature("pay_123", "sub_456", sig, "other"));
+  t("empty / malformed signature rejected", !rz.verifySubscriptionSignature("pay_123", "sub_456", "", "key_secret_x") && !rz.verifySubscriptionSignature("pay_123", "sub_456", "zz", "key_secret_x"));
+  const body = JSON.stringify({ event: "subscription.charged" });
+  const wsig = createHmac("sha256", "whsec").update(body).digest("hex");
+  t("webhook signature over the raw body accepted", rz.verifyWebhookSignature(body, wsig, "whsec"));
+  t("re-serialised body (whitespace change) rejected", !rz.verifyWebhookSignature(JSON.stringify(JSON.parse(body), null, 1), wsig, "whsec"));
+  t("key prefix selects mode", rz.modeOfKey("rzp_test_abc") === "test" && rz.modeOfKey("rzp_live_abc") === "live" && rz.modeOfKey("abc") === null);
+}
+
+section("Money & plans");
+{
+  const pl = await import("../src/lib/plans");
+  t("parseMoney is exact (no floats)", pl.parseMoney("299") === 29900 && pl.parseMoney("299.5") === 29950 && pl.parseMoney("0.07") === 7 && pl.parseMoney("1,999.99") === 199999);
+  t("parseMoney rejects bad input", [ "-1", "1.234", "abc", "", "1e3" ].every((v) => pl.parseMoney(v) === null));
+  t("formatMoney", pl.formatMoney(29900) === "₹299" && pl.formatMoney(29950) === "₹299.50" && pl.formatMoney(1999900, "USD") === "$19,999");
+  t("annual discount", pl.annualDiscount({ monthlyPrice: 29900, annualPrice: 299000 }) === 17 && pl.annualDiscount({ monthlyPrice: 0, annualPrice: 100 }) === null);
+  const ok = { id: "team", name: "Team", description: "", currency: "INR", monthlyPrice: 49900, annualPrice: 0, features: ["A"], limits: pl.DEFAULT_PLANS[1].limits, featured: false, sortOrder: 3 };
+  t("valid plan accepted", pl.planInputSchema.safeParse(ok).success);
+  t("negative price rejected", !pl.planInputSchema.safeParse({ ...ok, monthlyPrice: -100 }).success);
+  t("fractional minor units rejected", !pl.planInputSchema.safeParse({ ...ok, monthlyPrice: 499.5 }).success);
+  t("below Razorpay minimum rejected", !pl.planInputSchema.safeParse({ ...ok, monthlyPrice: 50 }).success);
+  t("unknown currency rejected", !pl.planInputSchema.safeParse({ ...ok, currency: "XYZ" }).success);
+  t("bad identifier rejected", !pl.planInputSchema.safeParse({ ...ok, id: "Team Plan!" }).success);
+  t("Free plan can't have a price", !pl.planInputSchema.safeParse({ ...ok, id: "free", monthlyPrice: 100 }).success);
+  t("negative limits rejected", !pl.planInputSchema.safeParse({ ...ok, limits: { ...ok.limits, dynamic: -1 } }).success);
+  t("unknown export format rejected", !pl.planInputSchema.safeParse({ ...ok, limits: { ...ok.limits, exports: ["exe"] } }).success);
+  const row = { id: "x", name: "X", description: "", currency: "INR", monthlyPrice: 0, annualPrice: 0, features: "not json", limits: "{\"dynamic\":-5}", featured: false, status: "weird", sortOrder: 0 };
+  const parsed = pl.planFromRow(row);
+  t("corrupt stored plan falls back to safe values", parsed.features.length === 0 && parsed.limits.dynamic >= 0 && parsed.status === "draft");
+}
+
+section("Branding validation");
+{
+  const br = await import("../src/lib/branding");
+  const base = { ...br.BRAND_DEFAULTS };
+  t("defaults are valid", br.brandingSchema.safeParse(base).success);
+  t("markup in the title rejected", !br.brandingSchema.safeParse({ ...base, siteTitle: "<script>alert(1)</script>" }).success);
+  t("markup in the brand name rejected", !br.brandingSchema.safeParse({ ...base, brandName: "</title><img src=x onerror=1>" }).success);
+  t("control characters rejected", !br.brandingSchema.safeParse({ ...base, brandName: "A\u0000B" }).success);
+  t("title template must contain %s", !br.brandingSchema.safeParse({ ...base, titleTemplate: "QRSathi" }).success);
+  t("colours must be #rrggbb", !br.brandingSchema.safeParse({ ...base, primaryColor: "red;}body{display:none" }).success && !br.brandingSchema.safeParse({ ...base, accentColor: "#12345" }).success);
+  t("asset names must be generated names", !br.brandingSchema.safeParse({ ...base, logo: "../../etc/passwd" }).success && !br.brandingSchema.safeParse({ ...base, logo: "https://evil.example/x.png" }).success);
+  t("invalid stored fields fall back to defaults", br.sanitizeBranding({ brandName: "<b>", primaryColor: "#000000" }).brandName === br.BRAND_DEFAULTS.brandName && br.sanitizeBranding({ primaryColor: "#000000" }).primaryColor === "#000000");
+  t("theme CSS contains only colour values", /^:root\{--brand:\d+ \d+% \d+%;--brand-fg:\d+ \d+% \d+%;--accent:\d+ \d+% \d+%\}$/.test(br.themeCss(base)));
+  t("button text picks a readable colour", br.onColor("#ffff00") === "#09090b" && br.onColor("#1e1b4b") === "#ffffff");
+  t("hex ↔ hsl round trip", br.hslTripletToHex(br.hexToHslTriplet("#3b3fd8")).length === 7);
+}
+
+section("Image upload validation");
+{
+  const ic = await import("../src/lib/image-check");
+  const png = (w: number, h: number) => { const b = Buffer.alloc(33); Buffer.from("89504e470d0a1a0a0000000d49484452", "hex").copy(b); b.writeUInt32BE(w, 16); b.writeUInt32BE(h, 20); return b; };
+  const jpg = (w: number, h: number) => Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x04, 0x00, 0x00, 0xff, 0xc0, 0x00, 0x11, 0x08, h >> 8, h & 255, w >> 8, w & 255, 0x03, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
+  const webp = (w: number, h: number) => { const b = Buffer.alloc(30); b.write("RIFF", 0); b.write("WEBP", 8); b.write("VP8X", 12); b.writeUIntLE(w - 1, 24, 3); b.writeUIntLE(h - 1, 27, 3); return b; };
+  const info = (b: Buffer, ext: string) => ic.inspectImage(b, ext) as any;
+  t("PNG dimensions", info(png(400, 120), "png").width === 400 && info(png(400, 120), "png").height === 120);
+  t("JPEG dimensions", info(jpg(1200, 630), "jpg").width === 1200 && info(jpg(1200, 630), "jpeg").height === 630);
+  t("WebP dimensions", info(webp(512, 512), "webp").width === 512);
+  t("content must match the extension", "error" in info(png(10, 10), "jpg") && "error" in info(Buffer.from("<html>"), "png"));
+  t("unsupported types rejected (gif, ico, html)", ["gif", "ico", "html"].every((e) => "error" in info(png(10, 10), e)));
+  const svg = (s: string) => info(Buffer.from(s), "svg");
+  t("plain SVG accepted with viewBox size", svg(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 40"><path d="M0 0h10v10z" fill="url(#g)"/></svg>`).width === 120);
+  for (const [name, s] of [
+    ["script", `<svg viewBox="0 0 1 1"><script>alert(1)</script></svg>`], ["onload", `<svg viewBox="0 0 1 1" onload="alert(1)"/>`],
+    ["javascript: link", `<svg viewBox="0 0 1 1"><a href="javascript:alert(1)">x</a></svg>`], ["external image", `<svg viewBox="0 0 1 1"><image href="https://evil/x.png"/></svg>`],
+    ["foreignObject", `<svg viewBox="0 0 1 1"><foreignObject><iframe/></foreignObject></svg>`], ["entity", `<!DOCTYPE svg [<!ENTITY x "y">]><svg viewBox="0 0 1 1"/>`],
+    ["external CSS", `<svg viewBox="0 0 1 1"><style>@import url(https://evil/x.css)</style></svg>`], ["data URL", `<svg viewBox="0 0 1 1"><image href="data:text/html,x"/></svg>`],
+  ] as const) t(`malicious SVG rejected: ${name}`, "error" in svg(s));
+  t("favicon must be square", ic.checkAssetRules("favicon", 1000, info(png(400, 120), "png")) !== null && ic.checkAssetRules("favicon", 1000, info(png(512, 512), "png")) === null);
+  t("oversized logo rejected", ic.checkAssetRules("logo", 2 * 1024 * 1024, info(png(400, 120), "png")) !== null);
+  t("tiny / huge dimensions rejected", ic.checkAssetRules("logo", 1000, info(png(8, 8), "png")) !== null && ic.checkAssetRules("logo", 1000, info(png(9000, 900), "png")) !== null);
+  t("SVG social image rejected", ic.checkAssetRules("ogImage", 1000, svg(`<svg viewBox="0 0 1200 630"/>`)) !== null);
+}
+
+section("Billing configuration rules (env-check)");
+t("malformed RAZORPAY_KEY_ID fails", checkEnv({ ...prodBase, RAZORPAY_KEY_ID: "abc", RAZORPAY_KEY_SECRET: "x", RAZORPAY_WEBHOOK_SECRET: "y" }).errors.some((e) => /RAZORPAY_KEY_ID/.test(e)));
+t("short SETTINGS_ENCRYPTION_KEY fails", checkEnv({ ...prodBase, SETTINGS_ENCRYPTION_KEY: "short" }).errors.length > 0);
+t("SETTINGS_ENCRYPTION_KEY equal to AUTH_SECRET fails", checkEnv({ ...prodBase, SETTINGS_ENCRYPTION_KEY: prodBase.AUTH_SECRET }).errors.length > 0);
+t("RAZORPAY_API_BASE override warns in production", checkEnv({ ...prodBase, RAZORPAY_API_BASE: "http://127.0.0.1:9" }).warnings.some((w) => /RAZORPAY_API_BASE/.test(w)));
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

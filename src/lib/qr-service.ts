@@ -2,7 +2,9 @@ import { z } from "zod";
 import type { QrCode, User } from "@prisma/client";
 import { db } from "./db";
 import { ApiError } from "./api";
-import { getPlan } from "./plans";
+import { planForUser } from "./plan-store";
+import { assertQrQuota, withQuota } from "./entitlements";
+import type { Plan } from "./plans";
 import { TYPE_MAP, buildPayload, isHostedType, validateContent } from "./qr-types";
 import { isHttpUrl, randomCode } from "./utils";
 
@@ -72,23 +74,10 @@ async function uniqueCode(alias?: string) {
   throw new ApiError(500, "Could not allocate a short code. Please retry.");
 }
 
-async function checkLimits(user: User, kind: { dynamic: boolean; hosted: boolean }) {
-  const plan = getPlan(user.plan);
-  const total = await db.qrCode.count({ where: { userId: user.id } });
-  if (total >= plan.savedLimit) throw new ApiError(403, `Your ${plan.name} plan allows ${plan.savedLimit} saved QR codes. Delete some or upgrade.`);
-  if (kind.hosted) {
-    const n = await db.qrCode.count({ where: { userId: user.id, isHosted: true } });
-    if (n >= plan.hostedLimit) throw new ApiError(403, `Your ${plan.name} plan allows ${plan.hostedLimit} hosted pages. Upgrade for more.`);
-  } else if (kind.dynamic) {
-    const n = await db.qrCode.count({ where: { userId: user.id, isDynamic: true, isHosted: false } });
-    if (n >= plan.dynamicLimit) throw new ApiError(403, `Your ${plan.name} plan allows ${plan.dynamicLimit} dynamic QR codes. Upgrade for more.`);
-  }
-}
-
-function parseExpiry(user: User, v: string | null | undefined) {
+function parseExpiry(plan: Plan, v: string | null | undefined) {
   if (v === undefined) return undefined;
   if (!v) return null;
-  if (!getPlan(user.plan).expiry) throw new ApiError(403, "Expiry dates are available on Pro and Business plans.");
+  if (!plan.limits.expiry) throw new ApiError(403, `Expiry dates aren't included in the ${plan.name} plan. Upgrade your plan to use them.`);
   const d = new Date(v);
   if (d.getTime() < Date.now()) throw new ApiError(400, "Expiry must be in the future.");
   return d;
@@ -99,11 +88,9 @@ export async function createQr(user: User, input: z.infer<typeof createSchema>, 
   const hosted = isHostedType(t, data);
   const dynamic = hosted || !!t.forceDynamic || (input.dynamic && !!t.dynamicCapable);
   if (input.dynamic && !t.dynamicCapable && !hosted) throw new ApiError(400, `${t.label} QR codes can't be dynamic — they don't open a web link.`);
-  await checkLimits(user, { dynamic, hosted });
-
-  const plan = getPlan(user.plan);
-  if (input.alias && !plan.customAlias) throw new ApiError(403, "Custom aliases are available on Pro and Business plans.");
-  const expiresAt = dynamic ? parseExpiry(user, input.expiresAt) : null;
+  const plan = await planForUser(user);
+  if (input.alias && !plan.limits.customAlias) throw new ApiError(403, `Custom aliases aren't included in the ${plan.name} plan. Upgrade your plan to use them.`);
+  const expiresAt = dynamic ? parseExpiry(plan, input.expiresAt) : null;
 
   let shortCode: string | null = null;
   let destination: string | null = null;
@@ -120,7 +107,10 @@ export async function createQr(user: User, input: z.infer<typeof createSchema>, 
     payload = buildPayload(t, data, { hostedUrl: "" });
   }
 
-  return db.qrCode.create({
+  // Quota check + insert are atomic per user (see entitlements.ts).
+  return withQuota(user.id, async (tx) => {
+    await assertQrQuota(tx, user.id, plan, { dynamic, hosted });
+    return tx.qrCode.create({
     data: {
       userId: user.id,
       name: input.name,
@@ -137,6 +127,7 @@ export async function createQr(user: User, input: z.infer<typeof createSchema>, 
       campaign: input.campaign || "",
       trackScans: input.trackScans ?? true,
     },
+    });
   });
 }
 
@@ -158,7 +149,7 @@ export async function updateQr(user: User, qr: QrCode, input: z.infer<typeof upd
     if (qr.status === "disabled") throw new ApiError(403, "This QR code was disabled by an administrator.");
     data.status = input.status;
   }
-  if (input.expiresAt !== undefined && qr.isDynamic) data.expiresAt = parseExpiry(user, input.expiresAt);
+  if (input.expiresAt !== undefined && qr.isDynamic) data.expiresAt = parseExpiry(await planForUser(user), input.expiresAt);
 
   if (input.content !== undefined) {
     const { t, data: content } = contentOrThrow(qr.type, input.content);
@@ -179,14 +170,16 @@ export async function updateQr(user: User, qr: QrCode, input: z.infer<typeof upd
 }
 
 export async function duplicateQr(user: User, qr: QrCode, base: string) {
-  await checkLimits(user, { dynamic: qr.isDynamic, hosted: qr.isHosted });
+  const plan = await planForUser(user);
   let shortCode: string | null = null;
   let payload = qr.payload;
   if (qr.isDynamic) {
     shortCode = await uniqueCode();
     payload = `${base}/${qr.isHosted ? "p" : "r"}/${shortCode}`;
   }
-  return db.qrCode.create({
+  return withQuota(user.id, async (tx) => {
+    await assertQrQuota(tx, user.id, plan, { dynamic: qr.isDynamic, hosted: qr.isHosted });
+    return tx.qrCode.create({
     data: {
       userId: user.id,
       name: `${qr.name} (copy)`.slice(0, 100),
@@ -202,6 +195,7 @@ export async function duplicateQr(user: User, qr: QrCode, base: string) {
       campaign: qr.campaign,
       trackScans: qr.trackScans,
     },
+    });
   });
 }
 

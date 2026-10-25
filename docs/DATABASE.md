@@ -116,6 +116,21 @@ Uploaded files are not in the database. Copy `UPLOAD_DIR` (default `./uploads`) 
 | Booleans | `0`/`1` | `TINYINT(1)` | Converted by Prisma and by the migration. |
 | Trailing spaces in unique keys | Significant | Ignored (PAD SPACE) | Inputs are trimmed by validation; the migration pre-flight detects collisions. |
 
+## Migrations in this repository
+
+| Migration | Contents |
+|---|---|
+| `20261025000000_init` | All original tables, plus binary collation for identifiers |
+| `20261025180000_billing_branding` | Additive only: `PricingPlan`, `ProviderPlan`, `Subscription`, `WebhookEvent`, `BrandAsset`; new `Payment` columns (currency, interval, refunds, subscription link), `User.quotaLock`, `Session.reauthAt`; binary collation for Razorpay ids |
+
+Both were applied to a fresh MySQL 8.4 server and to a server that already had the first one. In both cases `prisma migrate status` reported no drift afterwards. For SQLite development, `npx prisma db push` applies the same changes additively.
+
+**Rolling back** `20261025180000_billing_branding`:
+1. Restore the pre-upgrade backup.
+2. Alternatively, deploy the previous release. The new tables and columns are simply unused by older code, because every column has a default or is nullable.
+
+Don't drop the tables by hand while subscriptions exist.
+
 ## Changing the schema
 
 1. Edit `prisma/schema.prisma` (the canonical schema).

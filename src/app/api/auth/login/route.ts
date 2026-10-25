@@ -15,5 +15,5 @@ export const POST = handle(async (req) => {
   const updated = await db.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } });
   await createSession(updated, { kind: "user" });
   await audit("auth.login", { actor: { id: user.id }, ip: clientIp(req) });
-  return json({ user: publicUser(updated) });
+  return json({ user: await publicUser(updated) });
 });
