@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { History, LayoutDashboard, LogOut, Moon, Settings, Shield, Sun } from "lucide-react";
+import { History, LayoutDashboard, Library, LogOut, Moon, Settings, Shield, Sun } from "lucide-react";
 import { toast } from "sonner";
 import { useApp } from "./providers";
 import { LinkButton } from "./ui";
@@ -35,8 +35,8 @@ export function UserMenu() {
   if (!user)
     return (
       <div className="flex items-center gap-2">
-        <LinkButton href="/login" variant="ghost" size="sm" className="h-9">Log in</LinkButton>
-        <LinkButton href="/signup" size="sm" className="h-9">Sign up free</LinkButton>
+        <LinkButton href="/login" variant="ghost" size="sm" className="hidden sm:inline-flex">Log in</LinkButton>
+        <LinkButton href="/signup" size="sm">Sign up free</LinkButton>
       </div>
     );
 
@@ -57,21 +57,22 @@ export function UserMenu() {
         aria-expanded={open}
         aria-haspopup="menu"
       >
-        <span className="grid h-8 w-8 place-items-center rounded-lg bg-brand-gradient text-xs font-bold text-white">{initials}</span>
+        <span className="grid h-7 w-7 place-items-center rounded-full bg-brand text-[11px] font-semibold text-white">{initials}</span>
         <span className="hidden max-w-[120px] truncate text-sm font-medium sm:block">{user.name || user.email}</span>
       </button>
       {open && (
-        <div role="menu" className="card absolute right-0 top-12 z-50 w-60 animate-scale-in p-1.5 shadow-xl">
+        <div role="menu" className="card absolute right-0 top-11 z-50 w-60 animate-scale-in p-1.5 shadow-pop">
           <div className="px-3 py-2">
             <p className="truncate text-sm font-semibold">{user.name}</p>
             <p className="truncate text-xs text-slate-500">{user.email}</p>
-            <p className="mt-1 text-[11px] font-semibold uppercase tracking-wide text-brand">{user.planName} plan</p>
+            <p className="mt-1.5 inline-flex rounded-md bg-brand/10 px-1.5 py-0.5 text-[11px] font-medium text-brand">{user.planName} plan</p>
           </div>
           <div className="my-1 h-px bg-slate-100 dark:bg-slate-800" />
           {[
-            { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+            { href: "/dashboard", label: "Overview", icon: LayoutDashboard },
+            { href: "/codes", label: "My QR codes", icon: Library },
             { href: "/dashboard/history", label: "Download history", icon: History },
-            { href: "/dashboard/settings", label: "Account settings", icon: Settings },
+            { href: "/dashboard/settings", label: "Settings", icon: Settings },
             ...(user.role === "admin" ? [{ href: "/admin", label: "Admin", icon: Shield }] : []),
           ].map((i) => (
             <Link key={i.href} href={i.href} onClick={() => setOpen(false)} role="menuitem" className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm hover:bg-slate-100 dark:hover:bg-slate-800">

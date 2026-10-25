@@ -2,14 +2,14 @@
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { AlertTriangle, Archive, Barcode, FileDown, FileUp, Package, PackagePlus, Printer, Search } from "lucide-react";
+import { AlertTriangle, Archive, Barcode, FileDown, FileUp, Package, PackagePlus, Printer } from "lucide-react";
 import { toast } from "sonner";
 import type { ProductDto } from "@/lib/products";
 import { BARCODE_MAP, renderBarcodeSvg, renderLabelSvg } from "@/lib/barcodes";
 import { api } from "@/lib/fetcher";
 import { downloadBlob } from "@/lib/qr-export";
 import { headerKey, parseTableFile, toCsv, toXlsx } from "@/lib/table-file";
-import { Alert, Badge, Button, Card, EmptyState, Input, LinkButton, Modal, Segmented, Select, Skeleton } from "@/components/ui";
+import { Alert, Badge, Button, Card, ConfirmDialog, EmptyState, FilterBar, LinkButton, LoadingSkeleton, Modal, SearchInput, Segmented, Select, Stepper } from "@/components/ui";
 import { DEFAULT_BARCODE_STYLE, DEFAULT_LABEL, LabelDesigner, labelSize, toRenderOptions, type LabelSettings } from "@/components/barcode/barcode-ui";
 import { cn } from "@/lib/utils";
 
@@ -39,6 +39,8 @@ export function ProductsList() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [importOpen, setImportOpen] = useState(false);
   const [printOpen, setPrintOpen] = useState(false);
+  const [confirmArchive, setConfirmArchive] = useState(false);
+  useEffect(() => { if (sp.get("import") === "1") setImportOpen(true); }, [sp]);
 
   useEffect(() => { const t = setTimeout(() => setDq(q), 250); return () => clearTimeout(t); }, [q]);
   const load = useCallback(() => {
@@ -81,94 +83,155 @@ export function ProductsList() {
     load();
   };
 
-  const archiveSelected = async () => {
-    for (const p of sel) await api(`/api/products/${p.id}`, { method: "PATCH", json: { status: "archived" } }).catch(() => {});
-    toast.success(`Archived ${sel.length} products`);
-    setSelected(new Set());
-    load();
+  const setArchived = async (list: ProductDto[], status: "archived" | "active") => {
+    const done: ProductDto[] = [];
+    for (const p of list) {
+      try { await api(`/api/products/${p.id}`, { method: "PATCH", json: { status } }); done.push(p); } catch (e) { toast.error(`${p.sku}: ${(e as Error).message}`); }
+    }
+    return done;
   };
+  const archiveSelected = async () => {
+    const done = await setArchived(sel, "archived");
+    setSelected(new Set());
+    setConfirmArchive(false);
+    load();
+    if (done.length)
+      toast.success(`Archived ${done.length} product${done.length === 1 ? "" : "s"}`, {
+        action: { label: "Undo", onClick: async () => { await setArchived(done, "active"); toast.success("Restored"); load(); } },
+      });
+  };
+
+  const filtersActive = !!(dq || category || lowOnly || status !== "active");
+  const statusBadge = (p: ProductDto) =>
+    p.status === "archived" ? <Badge>Archived</Badge> : p.stock <= 0 ? <Badge tone="rose">Out of stock</Badge> : p.lowStock ? <Badge tone="amber">Low stock</Badge> : <Badge tone="green">In stock</Badge>;
 
   return (
     <div className="space-y-4">
       {lowCount > 0 && !lowOnly && status !== "archived" && (
         <Alert tone="warn" icon={<AlertTriangle className="h-4 w-4" />} title={`${lowCount} product${lowCount === 1 ? " is" : "s are"} low on stock`}>
-          <button className="font-semibold underline" onClick={() => setLowOnly(true)}>Show low-stock products</button>
+          <button className="font-medium underline" onClick={() => setLowOnly(true)}>Show only low-stock products</button>
         </Alert>
       )}
-      <div className="flex flex-wrap items-center gap-2">
-        <div className="relative w-full sm:w-72">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-          <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Name, SKU, barcode or category" className="py-2 pl-9" aria-label="Search products" />
-        </div>
-        <Select className="w-auto py-2" value={category} onChange={(e) => setCategory(e.target.value)} aria-label="Category">
+
+      <FilterBar
+        actions={<>
+          <Button variant="outline" onClick={() => setImportOpen(true)}><FileUp className="h-4 w-4" /> Import</Button>
+          <ExportMenu disabled={!items?.length} onExport={doExport} count={sel.length || items?.length || 0} />
+          <LinkButton href="/products/new"><PackagePlus className="h-4 w-4" /> Add product</LinkButton>
+        </>}>
+        <SearchInput value={q} onChange={setQ} placeholder="Search name, SKU, barcode, category" className="w-full sm:w-72" />
+        <Select className="w-full sm:w-44" value={category} onChange={(e) => setCategory(e.target.value)} aria-label="Category">
           <option value="">All categories</option>
           {categories.map((c) => <option key={c} value={c}>{c}</option>)}
         </Select>
         <Segmented size="sm" value={status} onChange={setStatus} options={[{ value: "active", label: "Active" }, { value: "archived", label: "Archived" }, { value: "all", label: "All" }]} />
-        <label className="flex items-center gap-1.5 text-sm"><input type="checkbox" checked={lowOnly} onChange={(e) => setLowOnly(e.target.checked)} /> Low stock</label>
-        <div className="flex flex-wrap gap-2 sm:ml-auto">
-          <Button variant="outline" size="sm" onClick={() => setImportOpen(true)}><FileUp className="h-4 w-4" /> Import</Button>
-          <Button variant="outline" size="sm" onClick={() => doExport("csv")} disabled={!items?.length}><FileDown className="h-4 w-4" /> CSV</Button>
-          <Button variant="outline" size="sm" onClick={() => doExport("xlsx")} disabled={!items?.length}><FileDown className="h-4 w-4" /> XLSX</Button>
-          <LinkButton href="/products/new" size="sm"><PackagePlus className="h-4 w-4" /> New product</LinkButton>
-        </div>
-      </div>
+        <label className="flex h-9 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-sm dark:border-slate-700 dark:bg-slate-900">
+          <input type="checkbox" checked={lowOnly} onChange={(e) => setLowOnly(e.target.checked)} className="accent-[hsl(var(--brand))]" /> Low stock only
+        </label>
+        {filtersActive && <Button variant="ghost" size="sm" onClick={() => { setQ(""); setCategory(""); setStatus("active"); setLowOnly(false); }}>Reset</Button>}
+      </FilterBar>
 
       {sel.length > 0 && (
-        <div className="flex flex-wrap items-center gap-2 rounded-xl bg-brand/10 px-4 py-2.5 text-sm">
-          <strong>{sel.length} selected</strong>
-          <Button size="sm" variant="outline" onClick={() => setPrintOpen(true)}><Printer className="h-4 w-4" /> Print labels</Button>
-          <Button size="sm" variant="outline" onClick={assignBarcodes}><Barcode className="h-4 w-4" /> Add barcodes from SKU</Button>
-          {status !== "archived" && <Button size="sm" variant="outline" onClick={archiveSelected}><Archive className="h-4 w-4" /> Archive</Button>}
-          <button className="ml-auto text-xs underline" onClick={() => setSelected(new Set())}>Clear</button>
+        <div className="flex flex-wrap items-center gap-2 rounded-lg border border-brand/20 bg-brand/5 px-3 py-2 text-sm" role="region" aria-label="Bulk actions">
+          <span className="font-medium">{sel.length} selected</span>
+          <Button size="sm" variant="outline" onClick={() => setPrintOpen(true)}><Printer className="h-3.5 w-3.5" /> Print labels</Button>
+          <Button size="sm" variant="outline" onClick={assignBarcodes}><Barcode className="h-3.5 w-3.5" /> Add barcodes from SKU</Button>
+          {status !== "archived" && <Button size="sm" variant="outline" onClick={() => setConfirmArchive(true)}><Archive className="h-3.5 w-3.5" /> Archive</Button>}
+          <button className="ml-auto text-xs font-medium text-slate-500 hover:text-slate-900 dark:hover:text-white" onClick={() => setSelected(new Set())}>Clear selection</button>
         </div>
       )}
 
-      {!items ? <Skeleton className="h-96" /> : items.length === 0 ? (
-        dq || category || lowOnly || status !== "active"
-          ? <p className="py-12 text-center text-sm text-slate-500">No products match these filters.</p>
-          : <EmptyState icon={<Package className="h-6 w-6" />} title="No products yet" action={<div className="flex gap-2"><LinkButton href="/products/new"><PackagePlus className="h-4 w-4" /> Add product</LinkButton><Button variant="outline" onClick={() => setImportOpen(true)}><FileUp className="h-4 w-4" /> Import CSV/XLSX</Button></div>}>
+      {!items ? <Card className="p-4"><LoadingSkeleton rows={6} /></Card> : items.length === 0 ? (
+        filtersActive
+          ? <EmptyState icon={<Package className="h-5 w-5" />} title="No products match these filters" action={<Button variant="outline" onClick={() => { setQ(""); setCategory(""); setStatus("active"); setLowOnly(false); }}>Reset filters</Button>} />
+          : <EmptyState icon={<Package className="h-5 w-5" />} title="No products yet" action={<div className="flex flex-wrap justify-center gap-2"><LinkButton href="/products/new"><PackagePlus className="h-4 w-4" /> Add product</LinkButton><Button variant="outline" onClick={() => setImportOpen(true)}><FileUp className="h-4 w-4" /> Import CSV/XLSX</Button></div>}>
               Add products with SKUs, prices, stock and barcodes — then scan to look them up and print labels.
             </EmptyState>
       ) : (
-        <Card className="overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500 dark:bg-slate-800/50">
-                <tr>
-                  <th className="w-10 px-4 py-2.5"><input type="checkbox" aria-label="Select all" checked={sel.length === items.length} onChange={(e) => setSelected(e.target.checked ? new Set(items.map((p) => p.id)) : new Set())} /></th>
-                  <th className="px-3 py-2.5">Product</th><th className="px-3 py-2.5">SKU</th><th className="px-3 py-2.5">Barcode</th><th className="px-3 py-2.5">Category</th><th className="px-3 py-2.5 text-right">Price</th><th className="px-4 py-2.5 text-right">Stock</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                {items.map((p) => (
-                  <tr key={p.id} className={cn("hover:bg-slate-50 dark:hover:bg-slate-800/40", selected.has(p.id) && "bg-brand/5")}>
-                    <td className="px-4 py-2.5"><input type="checkbox" aria-label={`Select ${p.name}`} checked={selected.has(p.id)} onChange={() => toggle(p.id)} /></td>
-                    <td className="px-3 py-2.5">
-                      <Link href={`/products/${p.id}`} className="flex items-center gap-3">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        {p.imageUrl ? <img src={p.imageUrl} alt="" className="h-9 w-9 rounded-lg object-cover" /> : <span className="grid h-9 w-9 place-items-center rounded-lg bg-slate-100 text-xs font-bold text-slate-500 dark:bg-slate-800">{p.name.slice(0, 2).toUpperCase()}</span>}
-                        <span><span className="block font-medium hover:text-brand">{p.name}</span>{p.variant && <span className="text-xs text-slate-500">{p.variant}</span>}</span>
-                      </Link>
-                    </td>
-                    <td className="px-3 py-2.5 font-mono text-xs">{p.sku}</td>
-                    <td className="px-3 py-2.5">{p.barcodes[0] ? <span className="flex items-center gap-1.5"><Badge>{BARCODE_MAP[p.barcodes[0].format]?.label}</Badge><span className="font-mono text-xs">{p.barcodes[0].value.length > 20 ? p.barcodes[0].value.slice(0, 19) + "…" : p.barcodes[0].value}</span></span> : <span className="text-xs text-slate-400">—</span>}</td>
-                    <td className="px-3 py-2.5 text-xs">{p.category || <span className="text-slate-400">—</span>}</td>
-                    <td className="px-3 py-2.5 text-right tabular-nums">{p.priceMinor ? money(p) : "—"}</td>
-                    <td className="px-4 py-2.5 text-right">
-                      <span className="font-semibold tabular-nums">{p.stock}</span>
-                      {p.status === "archived" ? <Badge className="ml-2">Archived</Badge> : p.lowStock && <Badge tone="amber" className="ml-2">Low</Badge>}
-                    </td>
+        <>
+          {/* Desktop / tablet: table */}
+          <Card className="hidden overflow-hidden md:block">
+            <div className="overflow-x-auto">
+              <table className="table">
+                <thead>
+                  <tr>
+                    <th className="w-10"><input type="checkbox" aria-label="Select all products" checked={sel.length === items.length} onChange={(e) => setSelected(e.target.checked ? new Set(items.map((p) => p.id)) : new Set())} className="accent-[hsl(var(--brand))]" /></th>
+                    <th>Product</th><th>SKU</th><th className="hidden lg:table-cell">Barcode</th><th className="text-right">Price</th><th className="text-right">Stock</th><th>Status</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </Card>
+                </thead>
+                <tbody>
+                  {items.map((p) => (
+                    <tr key={p.id} className={cn(selected.has(p.id) && "bg-brand/5")}>
+                      <td><input type="checkbox" aria-label={`Select ${p.name}`} checked={selected.has(p.id)} onChange={() => toggle(p.id)} className="accent-[hsl(var(--brand))]" /></td>
+                      <td>
+                        <Link href={`/products/${p.id}`} className="flex min-w-[180px] items-center gap-3">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          {p.imageUrl ? <img src={p.imageUrl} alt="" className="h-9 w-9 rounded-lg object-cover" /> : <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-slate-100 text-[11px] font-semibold text-slate-500 dark:bg-slate-800">{p.name.slice(0, 2).toUpperCase()}</span>}
+                          <span className="min-w-0"><span className="block truncate font-medium hover:text-brand">{p.name}</span><span className="block truncate text-xs text-slate-500">{[p.category, p.variant].filter(Boolean).join(" · ") || "—"}</span></span>
+                        </Link>
+                      </td>
+                      <td className="font-mono text-xs">{p.sku}</td>
+                      <td className="hidden lg:table-cell">{p.barcodes[0] ? <span className="flex items-center gap-1.5"><Badge>{BARCODE_MAP[p.barcodes[0].format]?.label}</Badge><span className="font-mono text-xs">{p.barcodes[0].value.length > 20 ? p.barcodes[0].value.slice(0, 19) + "…" : p.barcodes[0].value}</span></span> : <span className="text-xs text-slate-400">—</span>}</td>
+                      <td className="text-right tabular-nums">{p.priceMinor ? money(p) : "—"}</td>
+                      <td className={cn("text-right font-medium tabular-nums", p.lowStock && p.status === "active" && "text-amber-600 dark:text-amber-400")}>{p.stock}</td>
+                      <td>{statusBadge(p)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <p className="border-t border-slate-100 px-4 py-2 text-xs text-slate-500 dark:border-slate-800">{items.length} product{items.length === 1 ? "" : "s"}</p>
+          </Card>
+
+          {/* Mobile: cards */}
+          <ul className="space-y-2 md:hidden">
+            {items.map((p) => (
+              <li key={p.id} className={cn("card flex items-start gap-3 p-3", selected.has(p.id) && "ring-1 ring-brand")}>
+                <input type="checkbox" aria-label={`Select ${p.name}`} checked={selected.has(p.id)} onChange={() => toggle(p.id)} className="mt-1 h-4 w-4 accent-[hsl(var(--brand))]" />
+                <Link href={`/products/${p.id}`} className="min-w-0 flex-1">
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="truncate font-medium">{p.name}</p>
+                    <span className={cn("shrink-0 text-sm font-semibold tabular-nums", p.lowStock && p.status === "active" && "text-amber-600")}>{p.stock}</span>
+                  </div>
+                  <p className="mt-0.5 truncate font-mono text-xs text-slate-500">{p.sku}{p.barcodes[0] && ` · ${p.barcodes[0].value}`}</p>
+                  <div className="mt-2 flex items-center justify-between gap-2">
+                    <span className="text-sm tabular-nums text-slate-600 dark:text-slate-300">{p.priceMinor ? money(p) : "No price"}</span>
+                    {statusBadge(p)}
+                  </div>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </>
       )}
 
       <ImportDialog open={importOpen} onClose={() => setImportOpen(false)} onDone={load} />
       <BulkPrint open={printOpen} onClose={() => setPrintOpen(false)} products={sel} />
+      <ConfirmDialog open={confirmArchive} onClose={() => setConfirmArchive(false)} onConfirm={archiveSelected} title={`Archive ${sel.length} product${sel.length === 1 ? "" : "s"}?`} confirmLabel="Archive" tone="primary">
+        Archived products are hidden from lists and their stock can&apos;t change. Barcodes and history are kept, and you can restore them any time.
+      </ConfirmDialog>
+    </div>
+  );
+}
+
+function ExportMenu({ disabled, onExport, count }: { disabled: boolean; onExport: (k: "csv" | "xlsx") => void; count: number }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="relative">
+      <Button variant="outline" onClick={() => setOpen((o) => !o)} disabled={disabled} aria-haspopup="menu" aria-expanded={open} onBlur={() => setTimeout(() => setOpen(false), 150)}>
+        <FileDown className="h-4 w-4" /> Export
+      </Button>
+      {open && (
+        <div role="menu" className="card absolute right-0 top-11 z-20 w-56 p-1 shadow-pop">
+          <p className="px-2.5 py-1.5 text-[11px] text-slate-500">{count} product{count === 1 ? "" : "s"}</p>
+          {(["csv", "xlsx"] as const).map((k) => (
+            <button key={k} role="menuitem" onMouseDown={(e) => e.preventDefault()} onClick={() => { setOpen(false); onExport(k); }}
+              className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-sm hover:bg-slate-100 dark:hover:bg-slate-800">
+              <FileDown className="h-4 w-4 text-slate-400" /> {k === "csv" ? "CSV (.csv)" : "Excel (.xlsx)"}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -231,6 +294,7 @@ function ImportDialog({ open, onClose, onDone }: { open: boolean; onClose: () =>
   return (
     <Modal open={open} onClose={() => { reset(); onClose(); }} title="Import products (CSV / XLSX)" size="lg"
       footer={report ? <Button onClick={() => { reset(); onClose(); }}>Done</Button> : <><Button variant="ghost" onClick={onClose}>Cancel</Button><Button onClick={run} loading={busy} disabled={!rows.length || missing.length > 0}>Import {rows.length || ""} rows</Button></>}>
+      <Stepper className="mb-4" steps={["Upload file", "Check & preview", "Import", "Review results"]} current={report ? 3 : busy ? 2 : rows.length ? 1 : 0} />
       {!report ? (
         <div className="space-y-4">
           <p className="text-sm text-slate-600 dark:text-slate-300">Columns (header row): <code className="text-xs">{EXPORT_HEADERS.slice(0, -1).join(", ")}</code>. Only <strong>name</strong> and <strong>sku</strong> are required. <button className="font-semibold text-brand underline" onClick={template}>Download template</button></p>
@@ -240,6 +304,19 @@ function ImportDialog({ open, onClose, onDone }: { open: boolean; onClose: () =>
             <input type="file" accept=".csv,.xlsx" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) pick(f); e.target.value = ""; }} />
           </label>
           {rows.length > 0 && <p className="text-sm">{rows.length} rows found{missing.length > 0 && <span className="font-semibold text-rose-600"> — missing required column(s): {missing.join(", ")}</span>}</p>}
+          {rows.length > 0 && missing.length === 0 && (
+            <div className="overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-800">
+              <table className="table">
+                <thead><tr><th>#</th><th>Name</th><th>SKU</th><th>Price</th><th>Stock</th><th>Barcode</th></tr></thead>
+                <tbody>
+                  {rows.slice(0, 5).map((r, i) => (
+                    <tr key={i}><td className="text-slate-400">{i + 2}</td><td>{r.name || <span className="text-rose-600">missing</span>}</td><td className="font-mono text-xs">{r.sku || <span className="text-rose-600">missing</span>}</td><td>{r.price}</td><td>{r.stock}</td><td className="font-mono text-xs">{r.barcode}</td></tr>
+                  ))}
+                </tbody>
+              </table>
+              {rows.length > 5 && <p className="border-t border-slate-100 px-4 py-2 text-xs text-slate-500 dark:border-slate-800">Preview of the first 5 of {rows.length} rows. Every row is validated on import.</p>}
+            </div>
+          )}
           <div>
             <span className="label">If a SKU already exists</span>
             <Segmented size="sm" value={mode} onChange={setMode} options={[{ value: "skip", label: "Skip it" }, { value: "update", label: "Update it (stock change logged as adjustment)" }]} />

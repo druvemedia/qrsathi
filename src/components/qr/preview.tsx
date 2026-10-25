@@ -50,7 +50,7 @@ export function QrPreview({
 
   return (
     <div className={className}>
-      <div className={cn("relative mx-auto grid aspect-square w-full max-w-[340px] place-items-center rounded-3xl p-5", design.transparent ? "checker" : "bg-slate-100 dark:bg-slate-800/60")}>
+      <div className={cn("relative mx-auto grid aspect-square w-full max-w-[340px] place-items-center rounded-xl p-5", design.transparent ? "checker" : "bg-slate-100 dark:bg-slate-800/60")}>
         {result ? (
           <div
             className={cn("w-full transition duration-300 [&>svg]:h-auto [&>svg]:w-full [&>svg]:drop-shadow-sm", invalid && "opacity-30 blur-[2px]")}

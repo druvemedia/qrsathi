@@ -3,6 +3,8 @@
  * the DevTools protocol — no extra dependencies):
  *  1. Camera: a barcode is fed as a fake webcam (Y4M video) to /scanner?camera=1
  *  2. Upload: an image with several codes is set on the file input
+ *  3. Responsive: main pages at 375/768/1280 px never scroll horizontally
+ *     (set SHOT_DIR=folder to also save screenshots, DARK=1 to emulate dark mode)
  * Each test waits until the decoded values appear in the page.
  *   BASE_URL=http://localhost:3100 npm run test:browser
  * Set BROWSER=path/to/chrome to use another Chromium browser.
@@ -151,14 +153,15 @@ try {
   const page = await openPage(`${BASE}/scanner`, [], "upload");
   try {
     await waitForText(page, ["Universal Scanner"], 20);
-    // Server-rendered HTML appears before React hydrates; retry the click until Image mode is really shown.
-    for (let i = 0; i < 30; i++) {
-      await page.eval(`[...document.querySelectorAll('button[role=radio]')].find(b => b.textContent.trim() === 'Image')?.click()`);
-      await new Promise((r) => setTimeout(r, 500));
-      if (String(await page.eval("document.body.innerText")).includes("Drop an image")) break;
+    // Server-rendered HTML appears before React hydrates: wait until React has attached its handlers to the file input.
+    const fileSel = "input[type=file][accept='image/*']";
+    for (let i = 0; i < 40; i++) {
+      if (await page.eval(`(() => { const el = document.querySelector("${fileSel}"); return !!el && Object.keys(el).some(k => k.startsWith("__reactProps")); })()`)) break;
+      await new Promise((r) => setTimeout(r, 250));
     }
+    check("scanner offers Upload image without switching modes", String(await page.eval("document.body.innerText")).includes("Upload image"));
     const doc = await page.send("DOM.getDocument", { depth: -1, pierce: true });
-    const q = await page.send("DOM.querySelector", { nodeId: doc.root.nodeId, selector: "input[type=file][accept='image/*']" });
+    const q = await page.send("DOM.querySelector", { nodeId: doc.root.nodeId, selector: fileSel });
     await page.send("DOM.setFileInputFiles", { nodeId: q.nodeId, files: [sheet] });
     const want = ["8901234567890", "UPLOAD-39", "shop@okaxis", "PDF417-UPLOAD", "4 codes detected"];
     const t0 = Date.now();
@@ -169,6 +172,43 @@ try {
     check("UPI QR from upload shows payment warning, not a payment", t.includes("UPI payment request") && t.includes("Only scan a UPI QR to PAY"), t);
   } finally {
     page.close();
+  }
+
+  // ---------- 3. responsive layout ----------
+  console.log("\n# Responsive layout (no horizontal page overflow)");
+  const shotDir = process.env.SHOT_DIR;
+  const publicPages = ["/", "/generator", "/barcodes", "/scanner", "/scan-history", "/bulk", "/upi", "/pricing", "/help", "/login"];
+  const privatePages = ["/dashboard", "/codes", "/products", "/products/new", "/inventory", "/analytics", "/dynamic", "/dashboard/settings", "/studio"];
+  const rpage = await openPage(`${BASE}/login`, [], "responsive");
+  const email = `ui-${Date.now()}@example.com`;
+  try {
+    await waitForText(rpage, ["Welcome back"], 30);
+    const visit = async (path: string, width: number) => {
+      await rpage.send("Emulation.setDeviceMetricsOverride", { width, height: width < 600 ? 800 : 900, deviceScaleFactor: 1, mobile: width < 600 });
+      if (process.env.DARK) await rpage.send("Emulation.setEmulatedMedia", { features: [{ name: "prefers-color-scheme", value: "dark" }] });
+      await rpage.send("Page.navigate", { url: BASE + path });
+      await new Promise((r) => setTimeout(r, 400));
+      for (let i = 0; i < 30; i++) {
+        if ((await rpage.eval("document.readyState")) === "complete") break;
+        await new Promise((r) => setTimeout(r, 200));
+      }
+      await new Promise((r) => setTimeout(r, 900)); // let client data load
+      const m = await rpage.eval("JSON.stringify({ sw: document.documentElement.scrollWidth, iw: window.innerWidth, title: document.title })");
+      const { sw, iw } = JSON.parse(m);
+      check(`${String(width).padStart(4)}px ${path} fits the screen`, sw <= iw + 1, `scrollWidth ${sw} > ${iw}`);
+      if (shotDir) {
+        const shot = await rpage.send("Page.captureScreenshot", { format: "png", captureBeyondViewport: false });
+        writeFileSync(path.length > 1 ? `${shotDir}/${width}${path.replace(/\//g, "_")}.png` : `${shotDir}/${width}_home.png`, Buffer.from(shot.data, "base64"));
+      }
+    };
+    for (const w of [375, 768, 1280]) for (const p of publicPages) await visit(p, w);
+    // Sign up a throwaway user inside the page so the session cookie is set for this browser.
+    const signed = await rpage.eval(`fetch("/api/auth/signup", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: "UI Test", email: "${email}", password: "testpass123", acceptTerms: true }) }).then(r => r.status)`);
+    check("temporary user signed in for private pages", signed === 201, String(signed));
+    for (const w of [375, 768, 1280]) for (const p of privatePages) await visit(p, w);
+  } finally {
+    await rpage.eval(`fetch("/api/account", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ confirm: "${email}" }) }).then(r => r.status)`).catch(() => {});
+    rpage.close();
   }
 } finally {
   await new Promise((r) => setTimeout(r, 1500));

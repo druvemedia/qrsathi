@@ -121,8 +121,7 @@ export default async function HomePage() {
             <LinkButton href="/upi" className="mt-8" size="lg">Make my UPI QR <ArrowRight className="h-4 w-4" /></LinkButton>
           </div>
           <div className="relative mx-auto w-full max-w-sm">
-            <div className="absolute inset-0 -z-10 rotate-6 rounded-[2rem] bg-brand-gradient opacity-20 blur-xl" />
-            <div className="card animate-float overflow-hidden rounded-[2rem] p-0">
+                        <div className="card overflow-hidden rounded-2xl p-0 shadow-pop">
               <div className="bg-[#ea580c] px-6 py-6 text-center text-white">
                 <p className="font-display text-2xl font-extrabold">SCAN &amp; PAY</p>
                 <p className="text-sm text-white/85">Pay with any UPI app</p>
@@ -160,8 +159,7 @@ export default async function HomePage() {
 
       {/* CTA */}
       <section className="mx-auto max-w-7xl px-4 py-16 sm:px-6">
-        <div className="relative overflow-hidden rounded-3xl bg-brand-gradient px-8 py-14 text-center text-white">
-          <div className="absolute -left-20 -top-20 h-64 w-64 rounded-full bg-white/10" />
+        <div className="relative overflow-hidden rounded-2xl bg-slate-900 px-8 py-14 text-center text-white dark:border dark:border-slate-800">
           <ShieldCheck className="mx-auto h-10 w-10 text-white/80" />
           <h2 className="mt-4 font-display text-3xl font-extrabold sm:text-4xl">Start free in seconds</h2>
           <p className="mx-auto mt-3 max-w-xl text-white/85">Save your codes, create dynamic links and hosted pages, and track scans with a free account.</p>

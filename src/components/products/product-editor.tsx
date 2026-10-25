@@ -10,7 +10,7 @@ import { BARCODE_MAP, PRODUCT_FORMATS, buildGs1String, getBarcodeFormat, validat
 import { api } from "@/lib/fetcher";
 import type { ProductDto } from "@/lib/products";
 import { formatDate } from "@/lib/utils";
-import { Alert, Badge, Button, Card, Field, Input, Modal, Segmented, Select, Skeleton, Textarea } from "@/components/ui";
+import { Alert, Badge, Button, Card, Field, Input, Modal, Section, Select, Skeleton, Textarea, Tooltip } from "@/components/ui";
 import { BarcodePreview, DEFAULT_BARCODE_STYLE, DEFAULT_LABEL, GtinNotice, LabelDesigner, useBarcodeSvg, type LabelSettings } from "@/components/barcode/barcode-ui";
 
 const CURRENCIES = ["INR", "USD", "EUR", "GBP", "AED", "SGD"];
@@ -50,6 +50,7 @@ export function ProductEditor({ id }: { id?: string }) {
   const [stockModal, setStockModal] = useState<null | "in" | "out" | "adjust">(null);
   const [historyKey, setHistoryKey] = useState(0);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
     api<{ categories: string[] }>("/api/products?take=1&status=all").then((r) => setCategories(r.categories)).catch(() => {});
@@ -81,7 +82,27 @@ export function ProductEditor({ id }: { id?: string }) {
     extra: [form.batch && `Batch ${form.batch}`, form.expiryDate && `Exp ${form.expiryDate}`].filter(Boolean).join("  "),
   }), [form.name, form.variant, form.brand, priceText, form.sku, form.batch, form.expiryDate]);
 
+  /** Client-side checks mirroring the server rules, so mistakes show inline before submitting. */
+  const validate = () => {
+    const e: Record<string, string> = {};
+    if (!form.name.trim()) e.name = "Enter a product name.";
+    if (!form.sku.trim()) e.sku = "Enter an SKU — it identifies the product in your inventory.";
+    else if (!/^[\w\-./ ]+$/.test(form.sku.trim())) e.sku = "Use letters, numbers, spaces and - _ . / only.";
+    if (form.price && !/^\d{1,9}(\.\d{1,2})?$/.test(form.price.replace(/[,₹\s]/g, ""))) e.price = "Enter a price like 199 or 199.50.";
+    if (form.lowStockAt && !/^\d+$/.test(form.lowStockAt.trim())) e.lowStockAt = "Use a whole number, e.g. 5.";
+    if (!id && form.stock && !/^\d+$/.test(form.stock.trim())) e.stock = "Use a whole number, e.g. 24.";
+    if (form.imageUrl && !/^https?:\/\/\S+$/i.test(form.imageUrl.trim())) e.imageUrl = "The image link must start with http:// or https://";
+    setErrors(e);
+    return Object.keys(e).length === 0;
+  };
+
   const save = async () => {
+    if (saving) return;
+    if (!validate()) {
+      toast.error("Please fix the highlighted fields.");
+      document.querySelector("[aria-invalid=true]")?.scrollIntoView({ behavior: "smooth", block: "center" });
+      return;
+    }
     setSaving(true);
     try {
       const payload = { ...form, expiryDate: form.expiryDate || null, status: undefined as string | undefined };
@@ -98,30 +119,38 @@ export function ProductEditor({ id }: { id?: string }) {
         router.replace(`/products/${item.id}`);
       }
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Could not save");
+      // Keep everything the user typed; point at the field the server complained about where we can.
+      const msg = e instanceof Error ? e.message : "Could not save";
+      if (/SKU/i.test(msg)) setErrors((x) => ({ ...x, sku: msg }));
+      toast.error(msg);
     } finally {
       setSaving(false);
     }
   };
 
-  const setStatus = async (status: "active" | "archived") => {
+  const setStatus = async (status: "active" | "archived", silent = false) => {
     try {
       const { item } = await api<{ item: ProductDto }>(`/api/products/${id}`, { method: "PATCH", json: { status } });
       setSaved(item);
       setForm((f) => ({ ...f, status: item.status }));
       setHistoryKey((k) => k + 1);
-      toast.success(status === "archived" ? "Product archived" : "Product restored");
+      if (silent) return;
+      if (status === "archived") toast.success("Product archived", { action: { label: "Undo", onClick: () => setStatus("active", true) } });
+      else toast.success("Product restored");
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Failed");
     }
   };
 
-  if (loading) return <Skeleton className="h-[600px]" />;
+  if (loading) return <div className="space-y-4"><Skeleton className="h-10 w-64" /><Skeleton className="h-[520px] rounded-xl" /></div>;
+
+  const req = (k: string) => ({ invalid: !!errors[k], "aria-describedby": errors[k] ? `err-${k}` : undefined });
+  const sectionNo = (n: number) => <span className="mr-2 inline-grid h-5 w-5 place-items-center rounded-full bg-slate-100 text-[11px] font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-300">{n}</span>;
 
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <Link href="/products" className="inline-flex items-center gap-1 text-sm text-slate-500 hover:text-slate-900 dark:hover:text-white"><ArrowLeft className="h-4 w-4" /> Products</Link>
+        <Link href="/products" className="inline-flex items-center gap-1 text-sm text-slate-500 hover:text-slate-900 dark:hover:text-white"><ArrowLeft className="h-4 w-4" /> All products</Link>
         <div className="flex flex-wrap gap-2">
           {saved && (saved.status === "active"
             ? <Button variant="outline" onClick={() => setStatus("archived")}><Archive className="h-4 w-4" /> Archive</Button>
@@ -133,47 +162,74 @@ export function ProductEditor({ id }: { id?: string }) {
         </div>
       </div>
       {saved?.status === "archived" && <Alert tone="warn" icon={<Archive className="h-4 w-4" />}>This product is archived — it&apos;s hidden from the product list and stock can&apos;t change until you restore it.</Alert>}
+      <p className="text-xs text-slate-500"><span className="text-rose-500">*</span> Required fields</p>
 
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_400px]">
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_380px]">
         <div className="min-w-0 space-y-6">
-          <Card className="space-y-4 p-5">
-            <h2 className="font-display text-base font-bold">Product details</h2>
+          <Section title={<>{sectionNo(1)}Basic information</>}>
             <div className="grid gap-4 sm:grid-cols-2">
-              <Field label="Product name" required className="sm:col-span-2"><Input value={form.name} maxLength={150} onChange={(e) => set("name", e.target.value)} placeholder="Masala Chai 250 g" /></Field>
-              <Field label="SKU (internal)" required hint="Unique per product, e.g. CHAI-250-MAS">
-                <div className="flex gap-2">
-                  <Input value={form.sku} maxLength={64} onChange={(e) => set("sku", e.target.value)} className="font-mono" />
-                  <Button variant="outline" size="icon" title="Generate SKU" aria-label="Generate SKU" onClick={async () => {
-                    try { const r = await api<{ value: string }>("/api/products/next-code?format=code128"); set("sku", r.value.replace(/^INT-/, "SKU-")); } catch (e) { toast.error((e as Error).message); }
-                  }}><Sparkles className="h-4 w-4" /></Button>
-                </div>
+              <Field label="Product name" required error={errors.name} htmlFor="p-name" className="sm:col-span-2">
+                <Input id="p-name" value={form.name} maxLength={150} onChange={(e) => set("name", e.target.value)} placeholder="Masala Chai 250 g" {...req("name")} />
               </Field>
-              <Field label="Product ID" hint="Optional internal / ERP ID"><Input value={form.productCode} maxLength={64} onChange={(e) => set("productCode", e.target.value)} /></Field>
-              <Field label="Brand"><Input value={form.brand} maxLength={80} onChange={(e) => set("brand", e.target.value)} /></Field>
-              <Field label="Category">
-                <Input value={form.category} maxLength={80} list="cat-list" onChange={(e) => set("category", e.target.value)} />
+              <Field label="Brand" htmlFor="p-brand"><Input id="p-brand" value={form.brand} maxLength={80} onChange={(e) => set("brand", e.target.value)} /></Field>
+              <Field label="Category" htmlFor="p-cat" hint="Pick an existing one or type a new category">
+                <Input id="p-cat" value={form.category} maxLength={80} list="cat-list" onChange={(e) => set("category", e.target.value)} />
                 <datalist id="cat-list">{categories.map((c) => <option key={c} value={c} />)}</datalist>
               </Field>
-              <Field label="Variant / size / colour"><Input value={form.variant} maxLength={80} onChange={(e) => set("variant", e.target.value)} placeholder="250 g · Blue · XL" /></Field>
-              <Field label="Image URL" hint="https:// link to a product photo"><Input value={form.imageUrl} maxLength={1000} onChange={(e) => set("imageUrl", e.target.value)} /></Field>
-              <Field label="Description" className="sm:col-span-2"><Textarea rows={3} value={form.description} maxLength={2000} onChange={(e) => set("description", e.target.value)} /></Field>
+              <Field label="Description" htmlFor="p-desc" className="sm:col-span-2"><Textarea id="p-desc" rows={3} value={form.description} maxLength={2000} onChange={(e) => set("description", e.target.value)} /></Field>
+              <Field label="Image URL" htmlFor="p-img" error={errors.imageUrl} hint="https:// link to a product photo" className="sm:col-span-2">
+                <Input id="p-img" value={form.imageUrl} maxLength={1000} onChange={(e) => set("imageUrl", e.target.value)} {...req("imageUrl")} />
+              </Field>
             </div>
-          </Card>
+          </Section>
 
-          <Card className="space-y-4 p-5">
-            <h2 className="font-display text-base font-bold">Price, stock & traceability</h2>
+          <Section title={<>{sectionNo(2)}SKU & barcodes</>} description="The SKU is your own code; barcodes are what scanners read.">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field label="SKU" required error={errors.sku} hint="Unique per product, e.g. CHAI-250-MAS" htmlFor="p-sku">
+                <div className="flex gap-2">
+                  <Input id="p-sku" value={form.sku} maxLength={64} onChange={(e) => set("sku", e.target.value)} className="font-mono" {...req("sku")} />
+                  <Tooltip label="Generate a unique SKU" side="top">
+                    <Button variant="outline" size="icon" aria-label="Generate a unique SKU" onClick={async () => {
+                      try { const r = await api<{ value: string }>("/api/products/next-code?format=code128"); set("sku", r.value.replace(/^INT-/, "SKU-")); setErrors((x) => ({ ...x, sku: "" })); } catch (e) { toast.error((e as Error).message); }
+                    }}><Sparkles className="h-4 w-4" /></Button>
+                  </Tooltip>
+                </div>
+              </Field>
+              <Field label="Product ID" htmlFor="p-pid" hint="Optional internal / ERP ID"><Input id="p-pid" value={form.productCode} maxLength={64} onChange={(e) => set("productCode", e.target.value)} /></Field>
+            </div>
+            <div className="mt-5 border-t border-slate-100 pt-5 dark:border-slate-800">
+              <BarcodeManager form={form} setBarcodes={(b) => set("barcodes", b)} />
+            </div>
+          </Section>
+
+          <Section title={<>{sectionNo(3)}Price & stock</>}>
             <div className="grid gap-4 sm:grid-cols-3">
-              <Field label="Price"><Input inputMode="decimal" value={form.price} onChange={(e) => set("price", e.target.value)} placeholder="199.00" /></Field>
-              <Field label="Currency"><Select value={form.currency} onChange={(e) => set("currency", e.target.value)}>{CURRENCIES.map((c) => <option key={c}>{c}</option>)}</Select></Field>
-              <Field label="Low-stock alert at" hint="Alert when stock ≤ this"><Input inputMode="numeric" value={form.lowStockAt} onChange={(e) => set("lowStockAt", e.target.value)} /></Field>
-              {!id && <Field label="Opening stock" hint="Later changes use stock in/out"><Input inputMode="numeric" value={form.stock} onChange={(e) => set("stock", e.target.value)} /></Field>}
-              <Field label="Batch / lot no."><Input value={form.batch} maxLength={40} onChange={(e) => set("batch", e.target.value)} /></Field>
-              <Field label="Expiry date"><Input type="date" value={form.expiryDate} onChange={(e) => set("expiryDate", e.target.value)} /></Field>
-              <Field label="Manufacturer" className={id ? "sm:col-span-3" : "sm:col-span-2"}><Input value={form.manufacturer} maxLength={150} onChange={(e) => set("manufacturer", e.target.value)} placeholder="Name, address, licence no. (optional)" /></Field>
+              <Field label="Price" htmlFor="p-price" error={errors.price}><Input id="p-price" inputMode="decimal" value={form.price} onChange={(e) => set("price", e.target.value)} placeholder="199.00" {...req("price")} /></Field>
+              <Field label="Currency" htmlFor="p-cur"><Select id="p-cur" value={form.currency} onChange={(e) => set("currency", e.target.value)}>{CURRENCIES.map((c) => <option key={c}>{c}</option>)}</Select></Field>
+              <Field label="Low-stock alert at" htmlFor="p-low" error={errors.lowStockAt} hint="Alert when stock ≤ this"><Input id="p-low" inputMode="numeric" value={form.lowStockAt} onChange={(e) => set("lowStockAt", e.target.value)} {...req("lowStockAt")} /></Field>
+              {!id
+                ? <Field label="Opening stock" htmlFor="p-stock" error={errors.stock} hint="Later changes use Stock in / out"><Input id="p-stock" inputMode="numeric" value={form.stock} onChange={(e) => set("stock", e.target.value)} {...req("stock")} /></Field>
+                : <p className="text-xs text-slate-500 sm:col-span-3">Stock changes are recorded as movements — use <strong>Stock in</strong>, <strong>Stock out</strong> or <strong>Adjust</strong> in the panel on the right.</p>}
             </div>
-          </Card>
+          </Section>
 
-          <BarcodeManager form={form} setBarcodes={(b) => set("barcodes", b)} />
+          <Section title={<>{sectionNo(4)}Variants & product details</>}>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field label="Variant / size / colour" htmlFor="p-var"><Input id="p-var" value={form.variant} maxLength={80} onChange={(e) => set("variant", e.target.value)} placeholder="250 g · Blue · XL" /></Field>
+              <Field label="Manufacturer" htmlFor="p-mfr"><Input id="p-mfr" value={form.manufacturer} maxLength={150} onChange={(e) => set("manufacturer", e.target.value)} placeholder="Name, address, licence no." /></Field>
+            </div>
+          </Section>
+
+          <Section title={<>{sectionNo(5)}Batch & expiry</>} description="Optional — printed on labels and used for GS1 barcodes.">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field label="Batch / lot number" htmlFor="p-batch"><Input id="p-batch" value={form.batch} maxLength={40} onChange={(e) => set("batch", e.target.value)} /></Field>
+              <Field label="Expiry date" htmlFor="p-exp"><Input id="p-exp" type="date" value={form.expiryDate} onChange={(e) => set("expiryDate", e.target.value)} /></Field>
+            </div>
+          </Section>
+
+          <div className="flex justify-end">
+            <Button onClick={save} loading={saving} size="lg" className="w-full sm:w-auto"><Save className="h-4 w-4" /> {id ? "Save changes" : "Create product"}</Button>
+          </div>
 
           {id && saved && <StockHistory productId={id} refreshKey={historyKey} />}
         </div>
@@ -266,9 +322,9 @@ function BarcodeManager({ form, setBarcodes }: { form: Form; setBarcodes: (b: Ba
   };
 
   return (
-    <Card className="space-y-4 p-5">
+    <div className="space-y-4">
       <div>
-        <h2 className="font-display text-base font-bold">Barcodes</h2>
+        <h3 className="text-sm font-medium">Barcodes</h3>
         <p className="text-sm text-slate-500">A product can carry several codes (e.g. an EAN-13 on the pack and a GS1-128 on the carton). Scans of any of them find this product.</p>
       </div>
       {form.barcodes.length > 0 && (
@@ -319,7 +375,7 @@ function BarcodeManager({ form, setBarcodes }: { form: Form; setBarcodes: (b: Ba
         <Button size="sm" onClick={onAdd} loading={busy} disabled={form.barcodes.length >= 10 || (mode === "gs1" && !gtinSource)}><Plus className="h-4 w-4" /> Add barcode</Button>
       </div>
       <GtinNotice formatId={format} />
-    </Card>
+    </div>
   );
 }
 
@@ -347,7 +403,7 @@ function StockModal({ product, type, onClose, onDone }: { product: ProductDto; t
   const title = type === "in" ? "Stock in (received)" : type === "out" ? "Stock out (sold / used)" : "Adjust stock (stock-take)";
   return (
     <Modal open onClose={onClose} title={title} size="sm"
-      footer={<><Button variant="ghost" onClick={onClose}>Cancel</Button><Button onClick={submit} loading={busy} disabled={!valid || after < 0}>Confirm</Button></>}>
+      footer={<><Button variant="outline" onClick={onClose}>Cancel</Button><Button variant={type === "adjust" ? "secondary" : "primary"} onClick={submit} loading={busy} disabled={!valid || after < 0}>{!valid ? "Confirm" : type === "in" ? `Add ${n}` : type === "out" ? `Remove ${n}` : `Set stock to ${n}`}</Button></>}>
       <div className="space-y-4">
         <p className="text-sm"><strong>{product.name}</strong> · current stock <strong>{product.stock}</strong></p>
         <Field label={type === "adjust" ? "Counted quantity" : "Quantity"} error={qty && !valid ? "Enter a whole number" : after < 0 ? `Only ${product.stock} in stock` : undefined}>
@@ -356,6 +412,7 @@ function StockModal({ product, type, onClose, onDone }: { product: ProductDto; t
         <Field label="Reference" hint="Invoice, PO or order number (optional)"><Input value={reference} maxLength={100} onChange={(e) => setReference(e.target.value)} /></Field>
         <Field label="Note"><Input value={note} maxLength={300} onChange={(e) => setNote(e.target.value)} /></Field>
         {valid && after >= 0 && <p className="text-sm text-slate-500">Stock after: <strong className="text-slate-900 dark:text-white">{after}</strong></p>}
+        {type === "adjust" && valid && n !== product.stock && <Alert tone="warn">This replaces the recorded stock of {product.stock} with your counted quantity ({n > product.stock ? "+" : ""}{n - product.stock}). Use it after a physical stock-take.</Alert>}
       </div>
     </Modal>
   );

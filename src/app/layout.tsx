@@ -1,12 +1,11 @@
 import type { Metadata, Viewport } from "next";
-import { Inter, Plus_Jakarta_Sans } from "next/font/google";
+import { Inter } from "next/font/google";
 import "./globals.css";
 import { Providers } from "@/components/providers";
 import { getUser, publicUser } from "@/lib/session";
 import { BRAND_COLORS, getSettings } from "@/lib/settings";
 
 const sans = Inter({ subsets: ["latin"], variable: "--font-sans", display: "swap" });
-const display = Plus_Jakarta_Sans({ subsets: ["latin"], variable: "--font-display", weight: ["600", "700", "800"], display: "swap" });
 
 export async function generateMetadata(): Promise<Metadata> {
   const s = await getSettings();
@@ -37,7 +36,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const [settings, user] = await Promise.all([getSettings(), getUser()]);
   const brand = BRAND_COLORS[settings.brand] || BRAND_COLORS.indigo;
   return (
-    <html lang="en" suppressHydrationWarning className={`${sans.variable} ${display.variable}`}>
+    <html lang="en" suppressHydrationWarning className={sans.variable}>
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
         <style dangerouslySetInnerHTML={{ __html: `:root{--brand:${brand.hsl};--accent:${brand.accent}}` }} />

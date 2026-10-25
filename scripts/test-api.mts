@@ -36,7 +36,7 @@ console.log(`Testing ${BASE}\n`);
 
 // ---------- authentication required ----------
 console.log("# Authentication & CSRF");
-for (const [m, p] of [["GET", "/api/products"], ["POST", "/api/products"], ["GET", "/api/products/lookup?code=1"], ["GET", "/api/inventory"], ["POST", "/api/products/import"]] as const) {
+for (const [m, p] of [["GET", "/api/products"], ["POST", "/api/products"], ["GET", "/api/products/lookup?code=1"], ["GET", "/api/inventory"], ["GET", "/api/overview"], ["POST", "/api/products/import"]] as const) {
   const r = await call(m, p, m === "POST" ? {} : undefined);
   check(`${m} ${p} requires sign-in (401)`, r.status === 401, r.status);
 }
@@ -156,6 +156,8 @@ try {
   check("import stock change recorded as adjustment", sodaHist.data.items.some((t: any) => t.type === "adjust" && t.balance === 9 && t.reference === "import"), sodaHist.data.items);
 
   // ---------- inventory dashboard ----------
+  const ov = await call("GET", "/api/overview", undefined, A.cookie);
+  check("overview shows real counts (3 products, 59 units)", ov.status === 200 && ov.data.counts.products === 3 && ov.data.counts.units === 59 && Array.isArray(ov.data.activity), ov.data.counts);
   const inv = await call("GET", "/api/inventory", undefined, A.cookie);
   check("inventory summary totals", inv.status === 200 && inv.data.totals.products === 3 && inv.data.totals.units === 50 + 9, inv.data.totals);
 

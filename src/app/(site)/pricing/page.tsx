@@ -35,7 +35,7 @@ export default function PricingPage() {
           const hi = p.id === "pro";
           return (
             <div key={p.id} className={cn("card relative flex flex-col p-7", hi && "border-brand ring-2 ring-brand/20 lg:-mt-3 lg:mb-3")}>
-              {hi && <span className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-brand-gradient px-3 py-1 text-xs font-bold text-white">Most popular</span>}
+              {hi && <span className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-brand px-3 py-1 text-xs font-bold text-white">Most popular</span>}
               <h2 className="font-display text-xl font-bold">{p.name}</h2>
               <p className="mt-1 text-sm text-slate-500">{p.tagline}</p>
               <p className="mt-5"><span className="font-display text-4xl font-extrabold">₹{p.priceInr}</span><span className="text-slate-500">{p.priceInr ? " / month" : " forever"}</span></p>

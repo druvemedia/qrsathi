@@ -13,9 +13,8 @@ import { Alert, Button, Field, Input } from "@/components/ui";
 export function AuthAside() {
   const { settings } = useApp();
   return (
-    <aside className="relative hidden overflow-hidden bg-brand-gradient p-12 text-white lg:flex lg:flex-col">
-      <div className="absolute -right-24 -top-24 h-96 w-96 rounded-full bg-white/10 blur-2xl" />
-      <div className="absolute -bottom-32 -left-16 h-96 w-96 rounded-full bg-black/10 blur-2xl" />
+    <aside className="relative hidden overflow-hidden border-r border-slate-800 bg-slate-950 p-12 text-white lg:flex lg:flex-col">
+      <div className="absolute -right-24 -top-24 h-96 w-96 rounded-full bg-brand/20 blur-3xl" />
       <div className="relative [&_a]:text-white"><Logo /></div>
       <div className="relative mt-auto max-w-md">
         <h2 className="font-display text-4xl font-extrabold leading-tight">QR codes that work as hard as you do.</h2>

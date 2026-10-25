@@ -11,3 +11,6 @@ next-env.d.ts
 *.tsbuildinfo
 .next-*
 public/zxing/
+
+# Local database backups (contain user data)
+prisma/*.backup*

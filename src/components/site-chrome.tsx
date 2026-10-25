@@ -21,7 +21,7 @@ export function SiteHeader() {
   const { settings } = useApp();
   return (
     <>
-      {settings.announcement && <div className="bg-brand-gradient px-4 py-2 text-center text-xs font-medium text-white">{settings.announcement}</div>}
+      {settings.announcement && <div className="bg-brand px-4 py-2 text-center text-xs font-medium text-white">{settings.announcement}</div>}
       <header className="sticky top-0 z-40 border-b border-slate-200/70 bg-white/75 backdrop-blur-xl dark:border-slate-800/70 dark:bg-slate-950/75">
         <div className="mx-auto flex h-16 max-w-7xl items-center gap-6 px-4 sm:px-6">
           <Logo />

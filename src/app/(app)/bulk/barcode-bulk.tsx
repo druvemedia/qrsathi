@@ -9,7 +9,7 @@ import { labelsPdf, mmToPx, printLabels } from "@/lib/barcode-export";
 import { parseTableFile, toCsv } from "@/lib/table-file";
 import { GUEST_BULK_ROWS, getPlan } from "@/lib/plans";
 import { safeFilename, cn } from "@/lib/utils";
-import { Badge, Button, Card, Field, Segmented, Select } from "@/components/ui";
+import { Alert, Badge, Button, Card, Field, Segmented, Select, Stepper } from "@/components/ui";
 import { useApp } from "@/components/providers";
 import { trackDownload } from "@/components/qr/export-panel";
 import { DEFAULT_BARCODE_STYLE, DEFAULT_LABEL, FormatPicker, GtinNotice, LabelDesigner, StyleControls, labelSize, toRenderOptions, type BarcodeStyle, type LabelSettings } from "@/components/barcode/barcode-ui";
@@ -31,6 +31,7 @@ export function BarcodeBulk() {
   const [output, setOutput] = useState<"png" | "svg" | "both">("png");
   const [what, setWhat] = useState<"barcodes" | "labels">("barcodes");
   const [progress, setProgress] = useState<number | null>(null);
+  const [result, setResult] = useState<{ blob: Blob; name: string; count: number } | null>(null);
   const [filter, setFilter] = useState<"all" | "ok" | "error">("all");
   const fileRef = useRef<HTMLInputElement>(null);
   const f = getBarcodeFormat(format);
@@ -41,6 +42,7 @@ export function BarcodeBulk() {
       setHeaders(t.headers);
       setRows(t.rows);
       setFileName(file.name);
+      setResult(null);
       const find = (re: RegExp) => t.headers.find((h) => re.test(h.trim())) ?? NONE;
       setMap({
         value: find(/^(barcode|code|value|ean|upc|gtin|isbn|data|sku)$/i) || t.headers[0],
@@ -92,7 +94,10 @@ export function BarcodeBulk() {
       if (i % 5 === 0) setProgress(Math.round(((i + 1) / good.length) * 100));
     }
     files.push({ name: "report.csv", blob: new Blob([report() + (failed.length ? "\n" + toCsv([], failed).slice(1) : "")], { type: "text/csv" }) });
-    downloadBlob(await buildZip(files), `${safeFilename(fileName.replace(/\.[^.]+$/, "") || "barcodes")}-${format}.zip`);
+    const zipBlob = await buildZip(files);
+      const zipName = `${safeFilename(fileName.replace(/\.[^.]+$/, "") || "barcodes")}-${format}.zip`;
+      downloadBlob(zipBlob, zipName);
+      setResult({ blob: zipBlob, name: zipName, count: good.length });
     trackDownload(user, `Bulk ${f.label}: ${good.length}`, "zip");
     setProgress(null);
     toast.success(`ZIP ready — ${good.length} ${what}${bad.length ? `, ${bad.length} rows skipped (see report.csv)` : ""}`);
@@ -114,8 +119,18 @@ export function BarcodeBulk() {
   const sample = processed.find((r) => r.value);
   const sampleBarcode = useMemo(() => { try { return sample ? renderBarcodeSvg(format, sample.value!, toRenderOptions(style)) : ""; } catch { return ""; } }, [sample, format, style]);
 
+  const step = !headers.length ? 0 : progress !== null ? 4 : result ? 5 : processed.length ? (bad.length ? 2 : 3) : 1;
   return (
     <div className="space-y-6">
+      <Card className="space-y-3 p-4">
+        <Stepper steps={["Upload", "Map columns", "Validate", "Preview", "Generate", "Download"]} current={step} />
+        <p className="text-xs text-slate-500">File requirements: .csv or .xlsx, first row = column headers, one code per row. Invalid rows are reported and skipped — values are never changed silently.</p>
+      </Card>
+      {result && progress === null && (
+        <Alert tone="success" title={`Done — ${result.count} files generated`}>
+          Your download started automatically. <button className="font-medium underline" onClick={() => downloadBlob(result.blob, result.name)}>Download {result.name} again</button>
+        </Alert>
+      )}
       <div className="grid gap-6 lg:grid-cols-3">
         <Card className="p-5 lg:col-span-2">
           <p className="text-xs font-semibold uppercase tracking-wide text-brand">Step 1</p>

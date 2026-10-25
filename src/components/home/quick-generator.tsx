@@ -57,7 +57,7 @@ export function QuickGenerator() {
   };
 
   return (
-    <Card className="overflow-hidden shadow-2xl shadow-brand/10">
+    <Card className="overflow-hidden shadow-pop">
       <div className="flex gap-1 overflow-x-auto border-b border-slate-100 p-2 scrollbar-thin dark:border-slate-800" role="tablist">
         {QUICK.map((id) => {
           const t = getType(id);

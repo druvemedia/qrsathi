@@ -4,7 +4,7 @@ import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   AlertTriangle, BookOpen, Camera, CameraOff, Check, ClipboardPaste, Copy, Download, ExternalLink, Flashlight, FlashlightOff, History,
-  ImageUp, IndianRupee, Mail, MessageSquare, Package, PackagePlus, Phone, Repeat, ShieldAlert, ShieldCheck, SwitchCamera, Truck, Wifi, ZoomIn,
+  ImageUp, IndianRupee, Mail, MessageSquare, Package, PackagePlus, Phone, Repeat, ScanLine, ShieldAlert, ShieldCheck, SwitchCamera, Truck, Wifi, X, ZoomIn,
 } from "lucide-react";
 import { toast } from "sonner";
 import { analyzeUpi, analyzeUrl, overall, type SafetyNote } from "@/lib/content-safety";
@@ -16,17 +16,22 @@ import { addHistory, loadHistory, onHistoryChange, type HistoryEntry } from "@/l
 import { downloadBlob } from "@/lib/qr-export";
 import { api } from "@/lib/fetcher";
 import type { ProductDto } from "@/lib/products";
-import { Alert, Badge, Button, Card, Modal, Segmented, Select, Spinner, Switch } from "@/components/ui";
+import { Alert, Badge, Button, Card, Disclosure, Field, Kbd, Modal, Select, Spinner, Switch, Tooltip } from "@/components/ui";
 import { useApp } from "@/components/providers";
 import { cn, truncate } from "@/lib/utils";
 
 export function Scanner() {
   const sp = useSearchParams();
-  const [mode, setMode] = useState<"camera" | "image">("camera");
   const [filter, setFilter] = useState<ScanFilter>("all");
   const [hits, setHits] = useState<ScanHit[]>([]);
   const [continuous, setContinuous] = useState(false);
   const [history, setHistory] = useState<HistoryEntry[]>([]);
+  const [image, setImage] = useState<{ url: string; w: number; h: number; found: ScanHit[] } | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [drag, setDrag] = useState(false);
+  const fileInput = useRef<HTMLInputElement>(null);
+  const resultsRef = useRef<HTMLDivElement>(null);
+  const canPaste = typeof navigator !== "undefined" && !!navigator.clipboard && "read" in navigator.clipboard;
 
   useEffect(() => {
     setHistory(loadHistory());
@@ -38,50 +43,131 @@ export function Scanner() {
     navigator.vibrate?.(50);
     for (const h of list) addHistory({ text: h.text, format: h.format, formatLabel: h.formatLabel, kind: classifyScan(h.text, h.format, h.contentType), source });
     setHits((prev) => (source === "camera" && continuous ? [...list, ...prev.filter((p) => !list.some((l) => l.text === p.text))].slice(0, 10) : list));
+    // On phones the results sit below the camera — bring them into view.
+    if (window.matchMedia("(max-width: 1023px)").matches) setTimeout(() => resultsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
   }, [continuous]);
 
+  const scanFile = useCallback(async (file: File) => {
+    if (!file.type.startsWith("image/")) return toast.error("That file isn't an image. Choose a PNG, JPG or WEBP photo or screenshot.");
+    if (file.size > 25 * 1024 * 1024) return toast.error("That image is larger than 25 MB.");
+    setBusy(true);
+    const url = URL.createObjectURL(file);
+    try {
+      const img = new Image();
+      img.src = url;
+      await img.decode();
+      const found = await scanImageFile(file, filter);
+      setImage((p) => { if (p) URL.revokeObjectURL(p.url); return { url, w: img.naturalWidth, h: img.naturalHeight, found }; });
+      if (found.length) onHits(found, "image");
+      else toast.error(filter === "all"
+        ? "No QR code or barcode found. Try a sharper, well-lit photo where the code is flat and fills more of the frame."
+        : "Nothing found with the selected format filter. Set Formats to “All formats” and try again.");
+    } catch {
+      toast.error("Couldn't open that image.");
+    } finally {
+      setBusy(false);
+    }
+  }, [filter, onHits]);
+
+  useEffect(() => {
+    const onPaste = (e: ClipboardEvent) => {
+      const f = [...(e.clipboardData?.files || [])].find((x) => x.type.startsWith("image/"));
+      if (f) scanFile(f);
+    };
+    window.addEventListener("paste", onPaste);
+    return () => window.removeEventListener("paste", onPaste);
+  }, [scanFile]);
+
+  const pasteImage = async () => {
+    try {
+      const items = await (navigator.clipboard as any).read();
+      for (const it of items) {
+        const t = it.types.find((x: string) => x.startsWith("image/"));
+        if (t) return scanFile(new File([await it.getType(t)], "pasted-image", { type: t }));
+      }
+      toast.info("No image on the clipboard. Copy a screenshot first, or press Ctrl/⌘ + V.");
+    } catch {
+      toast.info("Your browser blocked clipboard access. Press Ctrl/⌘ + V on this page instead.");
+    }
+  };
+
   return (
-    <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_440px]">
-      <div className="space-y-4">
-        <div className="flex flex-wrap items-center gap-3">
-          <Segmented value={mode} onChange={(m) => { setMode(m); setHits([]); }} options={[
-            { value: "camera", label: <span className="flex items-center gap-1.5"><Camera className="h-4 w-4" /> Camera</span> },
-            { value: "image", label: <span className="flex items-center gap-1.5"><ImageUp className="h-4 w-4" /> Image</span> },
-          ]} />
-          <Select className="w-auto py-2 text-sm" value={filter} onChange={(e) => setFilter(e.target.value as ScanFilter)} aria-label="Formats to detect">
-            {SCAN_FILTERS.map((f) => <option key={f.value} value={f.value}>{f.label}</option>)}
-          </Select>
-          {mode === "camera" && <Switch checked={continuous} onChange={setContinuous} label="Continuous" description="Keep scanning, list every code" />}
+    <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_420px]">
+      <div className="space-y-3"
+        onDragOver={(e) => { e.preventDefault(); setDrag(true); }} onDragLeave={(e) => { if (e.currentTarget === e.target) setDrag(false); }}
+        onDrop={(e) => { e.preventDefault(); setDrag(false); const f = e.dataTransfer.files[0]; if (f) scanFile(f); }}>
+        <div className={cn("relative rounded-xl transition", drag && "ring-2 ring-brand ring-offset-2 ring-offset-slate-50 dark:ring-offset-slate-950")}>
+          <CameraScanner filter={filter} onHits={(l) => onHits(l, "camera")} paused={!continuous && hits.length > 0} onResume={() => setHits([])} autostart={sp.get("camera") === "1"} />
+          {drag && <div className="pointer-events-none absolute inset-0 grid place-items-center rounded-xl bg-brand/10 text-sm font-medium text-brand">Drop the image to scan it</div>}
         </div>
-        {mode === "camera"
-          ? <CameraScanner filter={filter} onHits={(l) => onHits(l, "camera")} paused={!continuous && hits.length > 0} onResume={() => setHits([])} autostart={sp.get("camera") === "1"} />
-          : <ImageScanner filter={filter} onHits={(l) => onHits(l, "image")} />}
-        <p className="text-xs text-slate-500">Decoding runs entirely in your browser (ZXing WebAssembly). Camera frames and images are never uploaded. History is stored on this device only.</p>
+
+        <input ref={fileInput} type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) scanFile(f); e.target.value = ""; }} />
+        <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center">
+          <Button variant="outline" onClick={() => fileInput.current?.click()} loading={busy}><ImageUp className="h-4 w-4" /> Upload image</Button>
+          {canPaste && <Button variant="outline" onClick={pasteImage}><ClipboardPaste className="h-4 w-4" /> Paste image</Button>}
+          <p className="col-span-2 text-xs text-slate-500 sm:ml-2">or drop an image here · <Kbd>Ctrl V</Kbd> pastes a screenshot</p>
+        </div>
+
+        <Disclosure title="Scan options" description="Formats to detect and continuous scanning">
+          <div className="flex flex-wrap items-start gap-6">
+            <Field label="Formats" htmlFor="scan-formats">
+              <Select id="scan-formats" className="w-52" value={filter} onChange={(e) => setFilter(e.target.value as ScanFilter)}>
+                {SCAN_FILTERS.map((f) => <option key={f.value} value={f.value}>{f.label}</option>)}
+              </Select>
+            </Field>
+            <div className="pt-6"><Switch checked={continuous} onChange={setContinuous} label="Continuous" description="Keep scanning and list every code" /></div>
+          </div>
+        </Disclosure>
+
+        {image && (
+          <Card className="p-3">
+            <div className="mb-2 flex items-center justify-between">
+              <p className="text-xs font-medium text-slate-500">Scanned image · {image.found.length} code{image.found.length === 1 ? "" : "s"} found</p>
+              <button onClick={() => { URL.revokeObjectURL(image.url); setImage(null); }} className="rounded p-1 text-slate-400 hover:text-slate-700" aria-label="Remove image"><X className="h-4 w-4" /></button>
+            </div>
+            <div className="relative mx-auto w-fit max-w-full">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={image.url} alt="Uploaded for scanning" className="max-h-64 rounded-lg" />
+              <svg className="pointer-events-none absolute inset-0 h-full w-full" viewBox={`0 0 ${image.w} ${image.h}`} preserveAspectRatio="none" aria-hidden>
+                {image.found.map((h, i) => h.corners && (
+                  <polygon key={i} points={h.corners.map((c) => `${c.x},${c.y}`).join(" ")} fill="hsl(var(--brand) / .15)" stroke="hsl(var(--brand))" strokeWidth={Math.max(3, image.w / 200)} />
+                ))}
+              </svg>
+            </div>
+          </Card>
+        )}
+        <p className="flex items-start gap-1.5 text-xs text-slate-500"><ShieldCheck className="mt-px h-3.5 w-3.5 shrink-0" aria-hidden /> Decoding runs on your device — camera frames and images are never uploaded. Nothing opens automatically, and scanning never changes stock.</p>
       </div>
 
-      <div className="space-y-4">
+      <div ref={resultsRef} className="scroll-mt-20 space-y-4">
         {hits.length > 0 ? (
           <>
-            {hits.length > 1 && <p className="text-sm font-semibold">{hits.length} codes detected</p>}
-            {hits.map((h, i) => <ResultCard key={`${h.format}-${h.text}-${i}`} hit={h} onClear={() => setHits((l) => l.filter((_, j) => j !== i))} />)}
+            <div className="flex items-center justify-between gap-2">
+              <h2 className="section-title">{hits.length === 1 ? "1 code detected" : `${hits.length} codes detected`}</h2>
+              <Button size="sm" variant="outline" onClick={() => setHits([])}><Repeat className="h-3.5 w-3.5" /> Scan again</Button>
+            </div>
+            <div className="space-y-3">
+              {hits.map((h, i) => <ResultCard key={`${h.format}-${h.text}-${i}`} hit={h} onClear={() => setHits((l) => l.filter((_, j) => j !== i))} />)}
+            </div>
           </>
         ) : (
-          <Card className="p-6 text-center text-sm text-slate-500">
-            <ShieldCheck className="mx-auto mb-2 h-8 w-8 text-slate-300" />
-            Scan a QR code or barcode to see what it contains. Nothing opens automatically and scanning never changes your stock.
+          <Card className="p-6 text-center">
+            <ScanLine className="mx-auto mb-2 h-6 w-6 text-slate-300" aria-hidden />
+            <p className="text-sm font-medium">Results appear here</p>
+            <p className="mt-1 text-xs text-slate-500">You&apos;ll see the code type and its content before anything opens.</p>
           </Card>
         )}
         {history.length > 0 && (
-          <Card className="p-4">
-            <div className="mb-2 flex items-center justify-between">
-              <p className="flex items-center gap-1.5 text-sm font-semibold"><History className="h-4 w-4" /> Recent scans</p>
-              <Link href="/scan-history" className="text-xs font-semibold text-brand hover:underline">All history →</Link>
+          <Card>
+            <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3 dark:border-slate-800">
+              <p className="flex items-center gap-1.5 text-sm font-medium"><History className="h-4 w-4 text-slate-400" aria-hidden /> Recent scans</p>
+              <Link href="/scan-history" className="text-xs font-medium text-slate-500 hover:text-slate-900 dark:hover:text-white">View all</Link>
             </div>
-            <ul className="space-y-0.5">
-              {history.slice(0, 8).map((h) => (
+            <ul className="p-1.5">
+              {history.slice(0, 6).map((h) => (
                 <li key={h.id}>
                   <button onClick={() => setHits([{ text: h.text, format: h.format, formatLabel: h.formatLabel, contentType: "Text", symbologyIdentifier: "" }])}
-                    className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left hover:bg-slate-100 dark:hover:bg-slate-800">
+                    className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left hover:bg-slate-50 dark:hover:bg-slate-800/60">
                     <Badge className="shrink-0">{h.formatLabel}</Badge>
                     <span className="min-w-0 flex-1 truncate font-mono text-xs">{truncate(h.text.replace(/\s+/g, " "), 60)}</span>
                     <span className="shrink-0 text-[10px] text-slate-400">{new Date(h.at).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}</span>
@@ -168,14 +254,18 @@ function CameraScanner({ filter, onHits, paused, onResume, autostart }: { filter
       const caps = (track.getCapabilities?.() ?? {}) as MediaTrackCapabilities & { torch?: boolean; zoom?: { min: number; max: number; step: number } };
       const settings = track.getSettings() as MediaTrackSettings & { zoom?: number };
       setTorch({ supported: !!caps.torch, on: false });
-      setZoom(caps.zoom ? { ...caps.zoom, value: settings.zoom ?? caps.zoom.min } : null);
+      setZoom(caps.zoom && caps.zoom.max > caps.zoom.min ? { ...caps.zoom, value: settings.zoom ?? caps.zoom.min } : null);
       setDevices((await navigator.mediaDevices.enumerateDevices()).filter((d) => d.kind === "videoinput"));
       setState("live");
-      // Warm up the decoder while the camera settles.
       raf.current = requestAnimationFrame(tick);
     } catch (e: any) {
       if (e?.name === "NotAllowedError" || e?.name === "SecurityError") setState("denied");
-      else { setErrMsg(e?.name === "NotFoundError" ? "No camera was found on this device." : e?.message || "Camera error"); setState("error"); }
+      else {
+        setErrMsg(e?.name === "NotFoundError" ? "No camera was found on this device. Upload or paste an image instead."
+          : e?.name === "NotReadableError" ? "Your camera is being used by another app. Close it and try again."
+          : "The camera couldn't start. Try again, or upload an image instead.");
+        setState("error");
+      }
     }
   }, [deviceId, facing, stop, tick]);
 
@@ -188,158 +278,89 @@ function CameraScanner({ filter, onHits, paused, onResume, autostart }: { filter
       await track()?.applyConstraints({ advanced: [{ torch: !torch.on } as any] });
       setTorch((t) => ({ ...t, on: !t.on }));
     } catch {
-      toast.error("Flashlight isn't available on this camera.");
+      toast.error("The flashlight isn't available on this camera.");
     }
   };
   const applyZoom = async (v: number) => {
     setZoom((z) => (z ? { ...z, value: v } : z));
     try { await track()?.applyConstraints({ advanced: [{ zoom: v } as any] }); } catch {}
   };
-  const flip = () => {
-    const next = facing === "environment" ? "user" : "environment";
-    setFacing(next);
-    setDeviceId("");
-    start({ facing: next, deviceId: "" });
+  const nextCamera = () => {
+    // Cycle through cameras; on phones this switches between rear and front.
+    if (devices.length > 1) {
+      const idx = devices.findIndex((d) => d.deviceId === deviceId);
+      const next = devices[(idx + 1) % devices.length];
+      setDeviceId(next.deviceId);
+      start({ deviceId: next.deviceId });
+    } else {
+      const f = facing === "environment" ? "user" : "environment";
+      setFacing(f);
+      start({ facing: f, deviceId: "" });
+    }
   };
 
   const messages: Partial<Record<CamState, [string, string]>> = {
-    denied: ["Camera permission denied", "Allow camera access in your browser's site settings, then try again — or switch to Image mode."],
-    insecure: ["Camera needs a secure connection", "Browsers only allow camera access on HTTPS or localhost. Open this site over HTTPS, or use Image mode."],
-    unsupported: ["Camera not supported", "This browser doesn't support camera access. Try a recent Chrome, Edge, Firefox or Safari, or use Image mode."],
+    denied: ["Camera access is blocked", "Allow camera access for this site in your browser settings (the camera icon in the address bar), then press Try again. You can also upload or paste an image below."],
+    insecure: ["Camera needs a secure connection", "Browsers only allow the camera on HTTPS or localhost. Open this site over HTTPS, or upload an image below."],
+    unsupported: ["This browser can't use the camera", "Try a recent version of Chrome, Edge, Firefox or Safari — or upload an image below."],
     error: ["Camera unavailable", errMsg],
   };
+  const iconBtn = "grid h-10 w-10 place-items-center rounded-full bg-slate-950/60 text-white backdrop-blur transition hover:bg-slate-950/80";
 
   return (
     <Card className="overflow-hidden">
-      <div className="relative aspect-[4/3] w-full bg-slate-950">
+      <div className="relative aspect-[4/3] w-full bg-slate-950 sm:aspect-video">
         <video ref={video} className={cn("h-full w-full object-cover", state !== "live" && "hidden", facing === "user" && !deviceId && "-scale-x-100")} playsInline muted />
         <canvas ref={canvas} className="hidden" />
         {state === "live" && (
-          <div className="pointer-events-none absolute inset-0 grid place-items-center">
-            <div className="relative h-[55%] w-[78%] rounded-3xl border-2 border-white/80 shadow-[0_0_0_9999px_rgba(2,6,23,.45)]">
-              <div className="absolute inset-x-4 top-1/2 h-0.5 animate-pulse bg-brand shadow-[0_0_12px_hsl(var(--brand))]" />
+          <>
+            <div className="pointer-events-none absolute inset-0 grid place-items-center">
+              <div className="relative h-[60%] w-[70%] max-w-md rounded-2xl border-2 border-white/90 shadow-[0_0_0_9999px_rgba(9,9,11,.45)]">
+                <div className="absolute inset-x-5 top-1/2 h-0.5 animate-pulse bg-brand shadow-[0_0_12px_hsl(var(--brand))]" />
+              </div>
             </div>
-          </div>
+            <p className="pointer-events-none absolute inset-x-0 top-3 text-center text-xs font-medium text-white/90 [text-shadow:0_1px_2px_rgb(0_0_0/.6)]">Point your camera at a QR code or barcode</p>
+            <div className="absolute bottom-3 right-3 flex gap-2">
+              {(devices.length > 1) && <Tooltip label="Switch camera" side="top"><button onClick={nextCamera} className={iconBtn} aria-label="Switch camera"><SwitchCamera className="h-4 w-4" /></button></Tooltip>}
+              {torch.supported && <Tooltip label={torch.on ? "Turn flashlight off" : "Turn flashlight on"} side="top"><button onClick={toggleTorch} className={cn(iconBtn, torch.on && "bg-white text-slate-900 hover:bg-white")} aria-pressed={torch.on} aria-label="Flashlight">{torch.on ? <FlashlightOff className="h-4 w-4" /> : <Flashlight className="h-4 w-4" />}</button></Tooltip>}
+              <Tooltip label="Stop camera" side="top"><button onClick={() => { stop(); setState("idle"); }} className={iconBtn} aria-label="Stop camera"><CameraOff className="h-4 w-4" /></button></Tooltip>
+            </div>
+            {zoom && (
+              <label className="absolute bottom-3 left-3 flex items-center gap-2 rounded-full bg-slate-950/60 px-3 py-2 text-xs text-white backdrop-blur">
+                <ZoomIn className="h-4 w-4" aria-hidden /><span className="sr-only">Zoom</span>
+                <input type="range" min={zoom.min} max={zoom.max} step={zoom.step || 0.1} value={zoom.value} onChange={(e) => applyZoom(+e.target.value)} className="w-24 sm:w-32" />
+                <span className="w-8 tabular-nums">{zoom.value.toFixed(1)}×</span>
+              </label>
+            )}
+            {devices.length > 2 && (
+              <Select className="absolute left-3 top-9 h-8 w-auto max-w-[200px] border-0 bg-slate-950/60 text-xs text-white backdrop-blur" value={deviceId} onChange={(e) => { setDeviceId(e.target.value); start({ deviceId: e.target.value }); }} aria-label="Choose camera">
+                <option value="">Default camera</option>
+                {devices.map((d, i) => <option key={d.deviceId || i} value={d.deviceId}>{d.label || `Camera ${i + 1}`}</option>)}
+              </Select>
+            )}
+          </>
         )}
         {state !== "live" && (
           <div className="absolute inset-0 grid place-items-center p-6 text-center text-white">
-            <div>
+            <div className="max-w-sm">
               {messages[state] ? (
-                <><CameraOff className="mx-auto h-10 w-10 text-rose-400" /><p className="mt-3 font-semibold">{messages[state]![0]}</p><p className="mx-auto mt-1 max-w-sm text-sm text-slate-300">{messages[state]![1]}</p></>
+                <><CameraOff className="mx-auto h-9 w-9 text-rose-300" aria-hidden /><p className="mt-3 font-medium">{messages[state]![0]}</p><p className="mt-1 text-sm text-slate-300">{messages[state]![1]}</p></>
               ) : (
-                <><Camera className="mx-auto h-10 w-10 text-slate-400" /><p className="mt-3 font-semibold">Scan QR codes & barcodes</p>
-                  <p className="mt-1 text-sm text-slate-300">Your browser will ask for camera permission. Video stays on your device.</p></>
+                <><span className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-white/10"><ScanLine className="h-7 w-7" aria-hidden /></span>
+                  <p className="mt-4 text-base font-medium">Point your camera at a QR code or barcode</p>
+                  <p className="mt-1 text-sm text-slate-400">Your browser will ask for permission. Video stays on your device.</p></>
               )}
               {state !== "insecure" && state !== "unsupported" && (
-                <Button className="mt-4" onClick={() => start()} loading={state === "starting"}>{state === "idle" ? "Allow camera & start" : "Try again"}</Button>
+                <Button className="mt-5" size="lg" onClick={() => start()} loading={state === "starting"}><Camera className="h-4 w-4" /> {state === "idle" || state === "starting" ? "Start scanning" : "Try again"}</Button>
               )}
             </div>
           </div>
         )}
         {paused && state === "live" && (
           <div className="absolute inset-0 grid place-items-center bg-slate-950/70">
-            <Button onClick={onResume}><Repeat className="h-4 w-4" /> Scan another</Button>
+            <Button size="lg" onClick={onResume}><Repeat className="h-4 w-4" /> Scan again</Button>
           </div>
         )}
-      </div>
-      {state === "live" && (
-        <div className="space-y-3 p-3">
-          <div className="flex flex-wrap items-center gap-2">
-            <Button size="sm" variant="outline" onClick={flip}><SwitchCamera className="h-4 w-4" /> {facing === "environment" ? "Front camera" : "Rear camera"}</Button>
-            {devices.length > 1 && (
-              <Select className="w-auto max-w-[220px] py-1.5 text-xs" value={deviceId} onChange={(e) => { setDeviceId(e.target.value); start({ deviceId: e.target.value }); }} aria-label="Camera">
-                <option value="">Auto ({facing === "environment" ? "rear" : "front"})</option>
-                {devices.map((d, i) => <option key={d.deviceId || i} value={d.deviceId}>{d.label || `Camera ${i + 1}`}</option>)}
-              </Select>
-            )}
-            {torch.supported && (
-              <Button size="sm" variant={torch.on ? "primary" : "outline"} onClick={toggleTorch} aria-pressed={torch.on}>
-                {torch.on ? <FlashlightOff className="h-4 w-4" /> : <Flashlight className="h-4 w-4" />} Flash
-              </Button>
-            )}
-            <Button size="sm" variant="ghost" className="ml-auto" onClick={() => { stop(); setState("idle"); }}>Stop</Button>
-          </div>
-          {zoom && zoom.max > zoom.min && (
-            <label className="flex items-center gap-3 text-xs text-slate-500">
-              <ZoomIn className="h-4 w-4" /> Zoom
-              <input type="range" min={zoom.min} max={zoom.max} step={zoom.step || 0.1} value={zoom.value} onChange={(e) => applyZoom(+e.target.value)} className="flex-1 accent-[hsl(var(--brand))]" />
-              <span className="w-10 text-right tabular-nums">{zoom.value.toFixed(1)}×</span>
-            </label>
-          )}
-          {!torch.supported && !zoom && <p className="text-[11px] text-slate-400">Flashlight and zoom appear here when your camera supports them (mostly Chrome on Android).</p>}
-        </div>
-      )}
-    </Card>
-  );
-}
-
-// ---------------- image ----------------
-function ImageScanner({ filter, onHits }: { filter: ScanFilter; onHits: (h: ScanHit[]) => void }) {
-  const input = useRef<HTMLInputElement>(null);
-  const [drag, setDrag] = useState(false);
-  const [preview, setPreview] = useState<{ url: string; w: number; h: number } | null>(null);
-  const [found, setFound] = useState<ScanHit[]>([]);
-  const [busy, setBusy] = useState(false);
-
-  const scanFile = useCallback(async (file: File) => {
-    if (!file.type.startsWith("image/")) return toast.error("Please choose an image file (PNG, JPG, WEBP…).");
-    if (file.size > 25 * 1024 * 1024) return toast.error("Image is larger than 25 MB.");
-    setBusy(true);
-    setFound([]);
-    const url = URL.createObjectURL(file);
-    try {
-      const img = new Image();
-      img.src = url;
-      await img.decode();
-      setPreview((p) => { if (p) URL.revokeObjectURL(p.url); return { url, w: img.naturalWidth, h: img.naturalHeight }; });
-      const hits = await scanImageFile(file, filter);
-      setFound(hits);
-      if (hits.length) {
-        onHits(hits);
-        toast.success(hits.length === 1 ? `Found ${hits[0].formatLabel}` : `Found ${hits.length} codes`);
-      } else {
-        toast.error(filter === "all"
-          ? "No supported QR code or barcode found. Try a sharper, well-lit image where the code is flat and fills more of the frame."
-          : "Nothing found with the selected format filter. Try “All formats”.");
-      }
-    } catch {
-      toast.error("Couldn't read that image file.");
-    } finally {
-      setBusy(false);
-    }
-  }, [filter, onHits]);
-
-  useEffect(() => {
-    const onPaste = (e: ClipboardEvent) => {
-      const f = [...(e.clipboardData?.files || [])].find((x) => x.type.startsWith("image/"));
-      if (f) scanFile(f);
-    };
-    window.addEventListener("paste", onPaste);
-    return () => window.removeEventListener("paste", onPaste);
-  }, [scanFile]);
-
-  return (
-    <Card
-      className={cn("grid min-h-[340px] place-items-center border-2 border-dashed p-6 text-center transition", drag ? "border-brand bg-brand/5" : "border-slate-200 dark:border-slate-800")}
-      onDragOver={(e) => { e.preventDefault(); setDrag(true); }} onDragLeave={() => setDrag(false)}
-      onDrop={(e) => { e.preventDefault(); setDrag(false); const f = e.dataTransfer.files[0]; if (f) scanFile(f); }}
-    >
-      <input ref={input} type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) scanFile(f); e.target.value = ""; }} />
-      <div className="w-full">
-        {preview ? (
-          <div className="relative mx-auto mb-4 inline-block max-w-full">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={preview.url} alt="Uploaded" className="max-h-72 rounded-xl" />
-            <svg className="pointer-events-none absolute inset-0 h-full w-full" viewBox={`0 0 ${preview.w} ${preview.h}`} preserveAspectRatio="none" aria-hidden>
-              {found.map((h, i) => h.corners && (
-                <polygon key={i} points={h.corners.map((c) => `${c.x},${c.y}`).join(" ")} fill="hsl(var(--brand) / .15)" stroke="hsl(var(--brand))" strokeWidth={Math.max(3, preview.w / 200)} />
-              ))}
-            </svg>
-          </div>
-        ) : <ImageUp className="mx-auto h-10 w-10 text-slate-300" />}
-        <p className="mt-2 font-semibold">Drop an image, paste a screenshot, or browse</p>
-        <p className="mt-1 flex items-center justify-center gap-1 text-xs text-slate-500"><ClipboardPaste className="h-3.5 w-3.5" /> Ctrl/⌘ + V works too · multiple codes per image are detected</p>
-        <Button className="mt-4" onClick={() => input.current?.click()} loading={busy}>Choose image</Button>
       </div>
     </Card>
   );
@@ -462,7 +483,7 @@ function ResultCard({ hit, onClear }: { hit: ScanHit; onClear: () => void }) {
       {lookupable && <ProductLookup code={text} format={hit.format} />}
       <div className="mt-4 flex flex-wrap gap-2">
         <Button variant="outline" size="sm" onClick={() => copy()}>{copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />} Copy</Button>
-        <Button variant="outline" size="sm" onClick={() => downloadBlob(new Blob([`Format: ${hit.formatLabel}\nType: ${KIND_LABELS[kind]}\nScanned: ${new Date().toISOString()}\n\n${text}\n`], { type: "text/plain" }), "scan-result.txt")}><Download className="h-4 w-4" /> Download</Button>
+        <Button variant="outline" size="sm" onClick={() => downloadBlob(new Blob([`Format: ${hit.formatLabel}\nType: ${KIND_LABELS[kind]}\nScanned: ${new Date().toISOString()}\n\n${text}\n`], { type: "text/plain" }), "scan-result.txt")}><Download className="h-4 w-4" /> Save</Button>
         <Button variant="ghost" size="sm" onClick={onClear}>Dismiss</Button>
       </div>
       <Modal open={!!confirm} onClose={() => setConfirm(null)} title={confirm?.label || ""} size="sm"

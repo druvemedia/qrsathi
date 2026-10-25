@@ -11,7 +11,7 @@ export interface SiteSettings {
 
 /** HSL triplets used for the --brand / --accent CSS variables. */
 export const BRAND_COLORS: Record<string, { label: string; hsl: string; accent: string }> = {
-  indigo: { label: "Indigo", hsl: "243 75% 59%", accent: "330 81% 60%" },
+  indigo: { label: "Indigo", hsl: "243 75% 59%", accent: "262 83% 58%" },
   violet: { label: "Violet", hsl: "262 83% 58%", accent: "199 89% 48%" },
   saffron: { label: "Saffron", hsl: "24 95% 50%", accent: "142 71% 35%" },
   emerald: { label: "Emerald", hsl: "160 84% 32%", accent: "199 89% 48%" },

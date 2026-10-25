@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils";
 
 export function LogoMark({ className }: { className?: string }) {
   return (
-    <span className={cn("grid h-8 w-8 place-items-center rounded-xl bg-brand-gradient text-white shadow-md shadow-brand/30", className)}>
+    <span className={cn("grid h-8 w-8 place-items-center rounded-lg bg-brand-gradient text-white shadow-sm", className)}>
       <svg viewBox="0 0 24 24" className="h-[18px] w-[18px]" fill="currentColor" aria-hidden>
         <path d="M3 3h7v7H3zm2 2v3h3V5zm9-2h7v7h-7zm2 2v3h3V5zM3 14h7v7H3zm2 2v3h3v-3zm9-2h3v3h-3zm4 0h3v3h-3zm-4 4h3v3h-3zm4 0h3v3h-3z" />
       </svg>

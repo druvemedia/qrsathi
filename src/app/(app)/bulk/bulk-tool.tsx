@@ -9,7 +9,7 @@ import { DEFAULT_DESIGN, renderQr, type QrDesign } from "@/lib/qr-render";
 import { buildPdf, buildZip, downloadBlob, exportSvg } from "@/lib/qr-export";
 import { GUEST_BULK_ROWS, getPlan } from "@/lib/plans";
 import { safeFilename, truncate, cn } from "@/lib/utils";
-import { Alert, Badge, Button, Card, Field, Input, Modal, Segmented, Select } from "@/components/ui";
+import { Alert, Badge, Button, Card, Field, Input, Modal, Segmented, Select, Stepper } from "@/components/ui";
 import { useApp } from "@/components/providers";
 import { DesignPanel } from "@/components/qr/design-panel";
 import { QrThumb } from "@/components/qr/preview";
@@ -67,6 +67,7 @@ export function BulkTool() {
   const [format, setFormat] = useState<"png" | "svg" | "both">("png");
   const [size, setSize] = useState(1024);
   const [progress, setProgress] = useState<number | null>(null);
+  const [result, setResult] = useState<{ blob: Blob; name: string; count: number } | null>(null);
   const [filter, setFilter] = useState<"all" | "ok" | "error">("all");
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -102,6 +103,7 @@ export function BulkTool() {
       setHeaders(hdrs);
       setRows(body);
       setFileName(file.name);
+      setResult(null);
       autoMap(hdrs, type);
       if (body.length > limit) toast.warning(`Only the first ${limit} rows will be processed on your plan.`);
       else toast.success(`Loaded ${body.length} rows`);
@@ -175,7 +177,10 @@ export function BulkTool() {
       }
       files.push({ name: "report.csv", blob: new Blob([[reportCsv(), ...failed].join("\n")], { type: "text/csv" }) });
       setProgress(100);
-      downloadBlob(await buildZip(files), `${safeFilename(fileName.replace(/\.[^.]+$/, "") || "bulk")}-qr-codes.zip`);
+      const zipBlob = await buildZip(files);
+      const zipName = `${safeFilename(fileName.replace(/\.[^.]+$/, "") || "bulk")}-qr-codes.zip`;
+      downloadBlob(zipBlob, zipName);
+      setResult({ blob: zipBlob, name: zipName, count: good.length });
       trackDownload(user, `Bulk: ${good.length} ${type.label} QR codes`, "zip");
       toast.success(`ZIP ready — ${good.length} QR codes${bad.length ? `, ${bad.length} rows skipped (see report.csv)` : ""}`);
     } catch (e) {
@@ -204,8 +209,18 @@ export function BulkTool() {
     downloadBlob(await exportSvg(svg, format === "svg" ? "svg" : "png", size), `${r.filename}.${format === "svg" ? "svg" : "png"}`);
   };
 
+  const step = !headers.length ? 0 : progress !== null ? 4 : result ? 5 : processed.length ? (bad.length ? 2 : 3) : 1;
   return (
     <div className="space-y-6">
+      <Card className="space-y-3 p-4">
+        <Stepper steps={["Upload", "Map columns", "Validate", "Preview", "Generate", "Download"]} current={step} />
+        <p className="text-xs text-slate-500">File requirements: .csv or .xlsx, first row = column headers, one code per row. Invalid rows are reported and skipped — values are never changed silently.</p>
+      </Card>
+      {result && progress === null && (
+        <Alert tone="success" title={`Done — ${result.count} files generated`}>
+          Your download started automatically. <button className="font-medium underline" onClick={() => downloadBlob(result.blob, result.name)}>Download {result.name} again</button>
+        </Alert>
+      )}
       <div className="grid gap-6 lg:grid-cols-3">
         <Card className="p-5">
           <p className="text-xs font-semibold uppercase tracking-wide text-brand">Step 1</p>
