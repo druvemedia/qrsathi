@@ -1,0 +1,13 @@
+node_modules
+.next
+out
+*.db
+*.db-journal
+.env
+.env.local
+uploads/*
+!uploads/.gitkeep
+next-env.d.ts
+*.tsbuildinfo
+.next-*
+public/zxing/

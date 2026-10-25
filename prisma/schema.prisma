@@ -1,0 +1,220 @@
+// QRSathi database schema.
+// SQLite is used for zero-config local development. For production switch the
+// provider to "postgresql" and point DATABASE_URL at your Postgres/Supabase DB.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id             String          @id @default(cuid())
+  email          String          @unique
+  name           String          @default("")
+  passwordHash   String?
+  googleId       String?         @unique
+  role           String          @default("user") // user | admin
+  plan           String          @default("free") // free | pro | business
+  planExpiresAt  DateTime? // null = no expiry (free or admin-assigned)
+  status         String          @default("active") // active | suspended
+  sessionVersion Int             @default(0)
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  lastLoginAt    DateTime?
+  qrCodes        QrCode[]
+  downloads      Download[]
+  uploads        Upload[]
+  resets         PasswordReset[]
+  payments       Payment[]
+  products       Product[]
+  barcodes       Barcode[]
+  inventoryTx    InventoryTransaction[]
+}
+
+model PasswordReset {
+  id        String    @id @default(cuid())
+  userId    String
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model QrCode {
+  id          String     @id @default(cuid())
+  userId      String
+  name        String
+  type        String
+  content     String // JSON: form data for the QR type
+  design      String // JSON: design settings
+  payload     String // exact text encoded in the QR image
+  isDynamic   Boolean    @default(false)
+  isHosted    Boolean    @default(false) // landing page served at /p/[shortCode]
+  shortCode   String?    @unique
+  destination String? // dynamic redirect target
+  status      String     @default("active") // active | paused | disabled (admin)
+  expiresAt   DateTime?
+  utm         String? // JSON: { source, medium, campaign, term, content }
+  campaign    String     @default("")
+  trackScans  Boolean    @default(true)
+  favorite    Boolean    @default(false)
+  isDemo      Boolean    @default(false)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  user        User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  scans       Scan[]
+  downloads   Download[]
+
+  @@index([userId])
+}
+
+model Scan {
+  id          String   @id @default(cuid())
+  qrId        String
+  createdAt   DateTime @default(now())
+  device      String   @default("unknown") // mobile | tablet | desktop | bot | unknown
+  browser     String   @default("unknown")
+  os          String   @default("unknown")
+  country     String   @default("") // ISO code from hosting platform header, if any
+  visitorHash String   @default("") // salted daily hash, never raw IP
+  isDemo      Boolean  @default(false)
+  qr          QrCode   @relation(fields: [qrId], references: [id], onDelete: Cascade)
+
+  @@index([qrId, createdAt])
+}
+
+model Download {
+  id        String   @id @default(cuid())
+  userId    String
+  qrId      String?
+  name      String
+  format    String
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  qr        QrCode?  @relation(fields: [qrId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt])
+}
+
+model Upload {
+  id         String   @id @default(cuid())
+  userId     String
+  filename   String
+  storedName String   @unique
+  mime       String
+  size       Int
+  createdAt  DateTime @default(now())
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model AbuseReport {
+  id            String   @id @default(cuid())
+  shortCode     String   @default("")
+  url           String   @default("")
+  reason        String
+  details       String   @default("")
+  reporterEmail String   @default("")
+  status        String   @default("open") // open | resolved | dismissed
+  createdAt     DateTime @default(now())
+}
+
+model Payment {
+  id          String   @id @default(cuid())
+  userId      String
+  provider    String // razorpay
+  providerRef String   @unique // payment link id
+  plan        String
+  amount      Int // in paise
+  status      String   @default("created") // created | paid | failed | expired
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Log {
+  id        String   @id @default(cuid())
+  level     String // info | warn | error
+  event     String
+  message   String   @default("")
+  userId    String?
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+}
+
+model Setting {
+  key   String @id
+  value String
+}
+
+// ---------- Products & inventory ----------
+
+model Product {
+  id           String                 @id @default(cuid())
+  userId       String
+  name         String
+  sku          String
+  productCode  String                 @default("") // internal product ID
+  brand        String                 @default("")
+  category     String                 @default("")
+  variant      String                 @default("") // size / colour / variant
+  description  String                 @default("")
+  manufacturer String                 @default("")
+  imageUrl     String                 @default("")
+  priceMinor   Int                    @default(0) // price in minor units (paise)
+  currency     String                 @default("INR")
+  stock        Int                    @default(0)
+  lowStockAt   Int                    @default(5)
+  batch        String                 @default("")
+  expiryDate   DateTime?
+  status       String                 @default("active") // active | archived
+  createdAt    DateTime               @default(now())
+  updatedAt    DateTime               @updatedAt
+  user         User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  barcodes     Barcode[]
+  transactions InventoryTransaction[]
+
+  @@unique([userId, sku])
+  @@index([userId, status])
+  @@index([userId, category])
+}
+
+model Barcode {
+  id        String   @id @default(cuid())
+  userId    String
+  productId String
+  format    String // id from src/lib/barcodes.ts
+  value     String // exact encoded text
+  lookupKey String // canonical key for scan matching (GTIN-14 for EAN/UPC family)
+  source    String   @default("internal") // internal | assigned (GS1-allocated) | existing
+  isPrimary Boolean  @default(false)
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, format, value])
+  @@index([userId, lookupKey])
+  @@index([productId])
+}
+
+model InventoryTransaction {
+  id        String   @id @default(cuid())
+  userId    String
+  productId String
+  type      String // created | in | out | adjust | updated | archived | restored | imported
+  quantity  Int      @default(0) // signed change in stock
+  balance   Int      @default(0) // stock after this entry
+  note      String   @default("")
+  reference String   @default("")
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId, createdAt])
+  @@index([userId, createdAt])
+}
