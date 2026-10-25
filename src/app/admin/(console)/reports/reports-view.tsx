@@ -1,9 +1,9 @@
 "use client";
 import { useState } from "react";
-import { Ban, CheckCircle2, XCircle } from "lucide-react";
+import { Ban, CheckCircle2, XCircle, UserX } from "lucide-react";
 import { toast } from "sonner";
-import { Badge, Button, ConfirmDialog, FilterBar, Section, Segmented } from "@/components/ui";
-import { DataTable, Pagination, fmtDateTime, fmtNum, useAdminApi, useAdminData, useListQuery, type Column, type Paged } from "@/components/admin/data";
+import { Badge, ConfirmDialog, Segmented } from "@/components/ui";
+import { DataTable, Pagination, fmtDateTime, fmtNum, useAdminApi, useAdminData, useListQuery, type Column, type Paged, TableView, RowMenu } from "@/components/admin/data";
 
 interface Row {
   id: string; shortCode: string; url: string; reason: string; details: string; status: string; createdAt: string;
@@ -59,34 +59,32 @@ export function ReportsView() {
     { key: "createdAt", label: "Received", hideSm: true, render: (r) => <span className="whitespace-nowrap text-xs">{fmtDateTime(r.createdAt)}</span> },
     {
       key: "actions", label: <span className="sr-only">Actions</span>, className: "text-right", render: (r) => r.status !== "open" ? null : (
-        <div className="flex flex-wrap justify-end gap-1">
-          {r.qr && r.qr.status !== "disabled" && <Button size="sm" variant="outline" onClick={() => setPending({ row: r, kind: "disable" })}><Ban className="h-3.5 w-3.5 text-rose-500" /> Disable code</Button>}
-          {r.qr && r.qr.user.status === "active" && r.qr.user.role === "user" && <Button size="sm" variant="outline" onClick={() => setPending({ row: r, kind: "suspend" })}>Suspend owner</Button>}
-          <Button size="sm" variant="ghost" onClick={() => setPending({ row: r, kind: "resolved" })} aria-label="Mark resolved" title="Mark resolved"><CheckCircle2 className="h-4 w-4" /></Button>
-          <Button size="sm" variant="ghost" onClick={() => setPending({ row: r, kind: "dismissed" })} aria-label="Dismiss" title="Dismiss"><XCircle className="h-4 w-4" /></Button>
-        </div>
+        <RowMenu label="Report actions" items={[
+          { label: "Mark resolved", icon: CheckCircle2, onClick: () => setPending({ row: r, kind: "resolved" }) },
+          { label: "Dismiss", icon: XCircle, onClick: () => setPending({ row: r, kind: "dismissed" }) },
+          { label: "Disable code", icon: Ban, danger: true, hidden: !(r.qr && r.qr.status !== "disabled"), onClick: () => setPending({ row: r, kind: "disable" }) },
+          { label: "Suspend owner", icon: UserX, danger: true, hidden: !(r.qr && r.qr.user.status === "active" && r.qr.user.role === "user"), onClick: () => setPending({ row: r, kind: "suspend" }) },
+        ]} />
       ),
     },
   ];
 
   const titles = { disable: "Disable this code and resolve?", suspend: "Suspend the owner and resolve?", resolved: "Mark as resolved?", dismissed: "Dismiss this report?" };
   return (
-    <Section title="Reports" description={data ? `${fmtNum(data.total)} ${list.state.filters.status || "total"}` : undefined}>
-      <FilterBar>
+    <TableView title="Reports" count={data ? `${fmtNum(data.total)} ${list.state.filters.status || "total"}` : undefined}
+          toolbar={<>
         <Segmented value={list.state.filters.status || ""} onChange={(v) => list.setFilter("status", v)}
           options={[{ value: "open", label: "Open" }, { value: "resolved", label: "Resolved" }, { value: "dismissed", label: "Dismissed" }, { value: "", label: "All" }]} />
-      </FilterBar>
-      <div className="mt-4">
-        <DataTable caption="Abuse reports" columns={columns} data={data?.items} loading={loading} error={error} onRetry={reload}
+          </>}
+          footer={data && data.total > 0 && <Pagination page={data.page} pages={data.pages} total={data.total} pageSize={data.pageSize} onPage={list.setPage} onPageSize={list.setPageSize} />}>
+          <DataTable caption="Abuse reports" columns={columns} data={data?.items} loading={loading} error={error} onRetry={reload}
           empty={{ title: list.state.filters.status === "open" ? "No open reports" : "No reports", body: list.state.filters.status === "open" ? "Nothing needs review right now." : undefined }} />
-        {data && <Pagination page={data.page} pages={data.pages} total={data.total} pageSize={data.pageSize} onPage={list.setPage} onPageSize={list.setPageSize} />}
-      </div>
       <ConfirmDialog open={!!pending} onClose={() => setPending(null)} onConfirm={apply} tone={pending?.kind === "resolved" || pending?.kind === "dismissed" ? "primary" : "danger"}
         title={pending ? titles[pending.kind] : ""} confirmLabel="Confirm">
         {pending?.kind === "disable" && "Visitors to this code will see a “disabled” notice. The owner can't re-enable it."}
         {pending?.kind === "suspend" && `${pending.row.qr?.user.email} will be signed out and blocked from signing in.`}
         {(pending?.kind === "resolved" || pending?.kind === "dismissed") && "No change is made to the code or its owner."}
       </ConfirmDialog>
-    </Section>
+    </TableView>
   );
 }

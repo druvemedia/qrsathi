@@ -54,7 +54,38 @@ Severity reflects impact if exploited in a production deployment.
 - **Form labels.** Labels weren't associated with many form controls (`Field` without `htmlFor`). `Field` now links its label, hint and error automatically; specific controls on `/bulk` and `/upi` were labelled. Every page now passes the accessible-name check.
 - **Admin tables at tablet width.** Visually hidden table headers widened the page at 768 px. The table container is now `relative`.
 
+## Round 2 (2026-10-25): billing, pricing and branding
+
+New attack surface:
+- the payment gateway and its credentials;
+- Razorpay checkout and webhooks;
+- admin-managed plans and entitlements;
+- branding uploads and metadata.
+
+Findings and fixes:
+
+| # | Severity | Finding | Route / file | Fix | Test |
+|---|---|---|---|---|---|
+| 24 | **High** | The plan quota could be exceeded under concurrency on **MySQL**: 8 parallel creates at a limit with one slot left produced 2 records. Prisma's `update()` reads the row before locking, which fixed the InnoDB repeatable-read snapshot before the lock wait. SQLite didn't show the bug, because it serialises writers. | `src/lib/entitlements.ts` | The quota transaction now starts with a raw locking `UPDATE` on the user row, so no snapshot exists before the lock. | `test:billing` concurrency check: 3 consecutive passes on MySQL 8.4, 2 on SQLite |
+| 25 | **High** | The global CSP header from `next.config.mjs` replaced the sandboxing CSP on user uploads (`/f/*`), a regression from round 1. An uploaded PDF or HTML-like file opened directly ran without `sandbox`. | `next.config.mjs` | Later header rules for `/f/*` and `/brand/*` restore `default-src 'none'; … sandbox`. | `test:billing` → `/f` and `/brand` CSP checks |
+| 26 | Medium | A plan could be granted by visiting a success URL or posting a forged checkout response (design risk for the new flow). | `/api/billing/verify` | The HMAC signature is verified, **then** the payment and subscription are fetched from Razorpay. Activation needs `captured` with the matching amount, currency, plan and owner; anything else stays pending. | forged signature, another user's subscription, `authorized` (not captured) → pending |
+| 27 | Medium | Duplicate or concurrent webhook deliveries could double-record payments or extend plans (design risk). | `/api/billing/webhook` | Event ledger with a unique `(provider, eventId)`; payments unique by Razorpay id; period ends *set* from Razorpay; refunds use the cumulative amount. | same event twice, the same payment under new event ids, 4 concurrent deliveries, refund delivered twice |
+| 28 | Medium | Cross-mode confusion: an event signed with the live secret could act on a test subscription. | `src/lib/billing.ts` | The matching secret determines the mode, which must equal the subscription's mode; plan and owner are checked too. | `test:billing` cross-mode check |
+| 29 | Medium | Credential exposure through settings APIs, page source, logs or audit entries. | `/api/admin/payments/config` | Secrets sealed with AES-256-GCM using a key from the environment only, HKDF-derived and bound per field. GET returns flags only (no masked fragments). Audit entries list field names, never values. | secret strings absent from every admin API, page, log, audit row and webhook ledger; ciphertext checked at rest |
+| 30 | Medium | Sensitive credential changes were possible on a long-lived admin session. | `requireRecentAdminAuth` | Credential changes and enabling checkout need a sign-in or re-confirmation (password + 2FA) within 15 minutes. | stale session → 403 `reauthRequired`; wrong password refused; correct password + code accepted |
+| 31 | Medium | Invalid or unverified credentials could have been used to enable (live) billing. | `setCheckout` | Checkout can be enabled only for complete credentials whose fingerprint matches a successful read-only verification; any key change resets verification. | wrong secret → `invalid`; enabling refused; invalid live keys can't enable live mode |
+| 32 | Medium | Stored XSS / markup injection through branding text, colours (CSS) or SVG uploads. | `/api/admin/branding*`, `/brand/*` | Validation rejects `<`, `>` and control characters; colours must be strict `#rrggbb`; asset names must be generated names of the right kind. SVG reject-list covers scripts, event handlers, external references, entities and `foreignObject`. Magic bytes and dimensions are checked, uploads are size-capped, and images are served with a sandboxing CSP. | `test:security` (8 malicious SVG cases, header parsing) and `test:billing` (title XSS, CSS injection, foreign asset, GIF/HTML/oversized uploads) |
+| 33 | Low | The client could try to choose the checkout price, currency or plan. | `/api/billing/subscribe` | Only `planId` and `interval` are accepted; the amount comes from the published plan and the synced Razorpay plan. | extra `price`/`amount`/`currency` ignored; draft, unpublished, archived and unknown plans → 404 |
+| 34 | Low | A price change could silently re-price existing subscribers or rewrite history. | `/api/admin/plans/[id]` | Old Razorpay plans stay attached to existing subscriptions; new checkouts are blocked until synced. Confirmation is required when live subscriptions exist, and payment amounts are snapshots. | existing subscription keeps ₹299 and renews at ₹299; new subscriber gets ₹399 only after sync |
+| 35 | Low | A webhook racing a credential save could overwrite it (lost update). | `payment-config.ts` | The "last webhook" timestamp is stored under its own key. | code review |
+
+### What is mocked vs real
+
+All Razorpay behaviour above was verified against a **deterministic mock** of the Razorpay REST API, run inside the test process. It was **not** verified against Razorpay (test or live mode): Checkout.js in a real browser, real webhook payloads and Razorpay's retry and refund behaviour remain to be checked. See [BILLING.md](BILLING.md#go-live-checklist).
+
 ## Remaining risks and recommendations
+
+0. **Billing:** complete the Razorpay go-live checklist (real test-mode purchase, failure, renewal, cancellation, refund) before live billing. Prefer environment variables over database-stored credentials for live keys. CSP still allows Razorpay Checkout’s script and frames (required).
 
 1. Approve and carry out the **git history cleanup** before making the repository public, and rotate the affected passwords (finding 4).
 2. Delete the demo administrator and review existing administrators (`npm run admin -- list`) (findings 1 and 5).

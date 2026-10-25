@@ -27,7 +27,7 @@ In the browser, every design change is rasterised and decoded with **jsQR**. The
 
 | Format | Generate | Scan in app | Notes |
 |---|:-:|:-:|---|
-| QR Code (all 26 content types, UPI) | ✅ | ✅ | Existing QR generator + studio |
+| QR Code (all 31 content types, UPI) | ✅ | ✅ | Existing QR generator + studio |
 | Micro QR | ✅ | ✅ | Up to ~35 digits / 21 characters |
 | GS1 QR Code | ✅ | ✅ | GS1 element strings |
 | EAN-13 / EAN-8 | ✅ | ✅ | Check digit validated or calculated |

@@ -1,11 +1,11 @@
 import {
-  Briefcase, Building2, CalendarDays, Camera, CirclePlay, Contact, FileText, Globe, IndianRupee, Landmark, LayoutTemplate, Link,
+  AtSign, Ghost, Music, Music2, Send, Briefcase, Building2, CalendarDays, Camera, CirclePlay, Contact, FileText, Globe, IndianRupee, Landmark, LayoutTemplate, Link,
   Mail, MapPin, MessageCircle, MessageSquare, Package, Phone, QrCode, RefreshCw, Smartphone, Star, ThumbsUp, TicketPercent, Type,
   UtensilsCrossed, Wifi, type LucideProps,
 } from "lucide-react";
 
 const ICONS = {
-  Briefcase, Building2, CalendarDays, Camera, CirclePlay, Contact, FileText, Globe, IndianRupee, Landmark, LayoutTemplate, Link,
+  AtSign, Ghost, Music, Music2, Send, Briefcase, Building2, CalendarDays, Camera, CirclePlay, Contact, FileText, Globe, IndianRupee, Landmark, LayoutTemplate, Link,
   Mail, MapPin, MessageCircle, MessageSquare, Package, Phone, QrCode, RefreshCw, Smartphone, Star, ThumbsUp, TicketPercent, Type,
   UtensilsCrossed, Wifi,
 };

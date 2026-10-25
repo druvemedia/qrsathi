@@ -7,7 +7,9 @@ import { Alert, Badge, Button, ConfirmDialog, Field, Input, LoadingSkeleton, Sec
 import { useAdminApi, useAdminData } from "@/components/admin/data";
 import { useUnsavedGuard } from "@/components/admin/guards";
 import { FetchError } from "@/lib/fetcher";
-import { BRAND_DEFAULTS, assetUrl, brandingSchema, contrastRatio, footerLine, hexToHslTriplet, onColor, type AssetKind, type Branding } from "@/lib/branding";
+import { BRAND_DEFAULTS, SOCIAL_NETWORKS, assetUrl, brandingSchema, contrastRatio, footerLine, hexToHslTriplet, onColor, sameValue, socialLinks, type AssetKind, type Branding } from "@/lib/branding";
+import { BrandIcon } from "@/components/brand-icon";
+import { SettingsGroup, SettingsNav } from "@/components/admin/settings-ui";
 import { cn } from "@/lib/utils";
 
 interface AssetRow { kind: AssetKind; storedName: string; width: number; height: number; size: number; mime: string }
@@ -31,7 +33,7 @@ export function BrandingEditor({ section }: { section: EditorSection }) {
   const hasDraft = !!data?.draft;
   const pendingChanges = useMemo(() => {
     if (!data || !form) return [] as (keyof Branding)[];
-    return (Object.keys(form) as (keyof Branding)[]).filter((k) => form[k] !== data.published[k]);
+    return (Object.keys(form) as (keyof Branding)[]).filter((k) => !sameValue(form[k], data.published[k]));
   }, [data, form]);
 
   if (error) return <Alert tone="error" title="Couldn't load branding">{error} <button onClick={reload} className="font-medium underline">Retry</button></Alert>;
@@ -41,7 +43,7 @@ export function BrandingEditor({ section }: { section: EditorSection }) {
   const validate = () => {
     const r = brandingSchema.safeParse(form);
     if (r.success) { setErrors({}); return true; }
-    setErrors(Object.fromEntries(r.error.issues.map((i) => [String(i.path[0]), i.message])));
+    setErrors(Object.fromEntries(r.error.issues.map((i) => [i.path[0] === "social" ? i.path.join(".") : String(i.path[0]), i.message])));
     toast.error("Fix the highlighted fields first.");
     return false;
   };
@@ -86,16 +88,19 @@ export function BrandingEditor({ section }: { section: EditorSection }) {
 
   return (
     <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_420px]">
-      <div className="min-w-0 space-y-6">
-        <div className="flex flex-wrap items-center gap-2">
+      <div className="min-w-0">
+        <div className="mb-2 flex flex-wrap items-center gap-2">
           {status}
           <span className="text-xs text-slate-500">{pendingChanges.length ? `${pendingChanges.length} field${pendingChanges.length === 1 ? "" : "s"} differ from the live site` : "Matches the live site"}</span>
         </div>
 
+        <SettingsNav items={section === "identity"
+          ? [["identity", "Identity"], ["seo", "Search & sharing"], ["contact", "Contact"], ["social", "Social"], ["images", "Favicon & image"]]
+          : [["colours", "Colours"], ["theme", "Theme & header"], ["logos", "Logos"]]} />
         {section === "identity" ? <IdentityFields form={form} set={set} errors={errors} /> : <AppearanceFields form={form} set={set} errors={errors} />}
         <AssetFields section={section} form={form} set={set} assets={data.assets} rules={data.rules} onUploaded={reload} />
 
-        <div className="sticky bottom-0 z-10 -mx-4 flex flex-wrap items-center gap-2 border-t border-slate-200 bg-white/95 px-4 py-3 backdrop-blur dark:border-slate-800 dark:bg-slate-950/95 sm:mx-0 sm:rounded-xl sm:border">
+        <div className="sticky bottom-4 z-10 mt-6 flex flex-wrap items-center gap-1.5 rounded-2xl border border-slate-200 bg-white/95 px-3 py-2 shadow-pop backdrop-blur dark:border-slate-800 dark:bg-slate-900/95 [&_button]:h-8 [&_button]:px-3 [&_button]:text-xs">
           <Button onClick={() => (pendingChanges.length ? setConfirm("publish") : toast.info("Nothing to publish."))} loading={busy === "publish"} disabled={!!busy}>Publish</Button>
           <Button variant="outline" onClick={saveDraft} loading={busy === "save"} disabled={!dirty || !!busy}>Save draft</Button>
           <Button variant="ghost" onClick={() => setConfirm("cancel")} disabled={!dirty || !!busy}><Undo2 className="h-4 w-4" /> Cancel edits</Button>
@@ -143,7 +148,7 @@ function IdentityFields({ form, set, errors }: { form: Branding; set: SetFn; err
   );
   return (
     <>
-      <Section title="Site identity">
+      <SettingsGroup stacked id="identity" title="Site identity">
         <div className="grid gap-4 sm:grid-cols-2">
           {txt("brandName", "Brand name", { max: 40, hint: "Shown in the header, footer and e-mails." })}
           {txt("companyName", "Company / legal name", { max: 100 })}
@@ -152,8 +157,8 @@ function IdentityFields({ form, set, errors }: { form: Branding; set: SetFn; err
           {txt("shortDescription", "Short description", { max: 120 })}
           <div className="sm:col-span-2">{txt("homeDescription", "Homepage description", { max: 400, area: true })}</div>
         </div>
-      </Section>
-      <Section title="Search & social sharing">
+      </SettingsGroup>
+      <SettingsGroup stacked id="seo" title="Search & social sharing">
         <div className="grid gap-4">
           {txt("metaDescription", "SEO meta description", { max: 170 })}
           <div className="grid gap-4 sm:grid-cols-2">
@@ -161,15 +166,28 @@ function IdentityFields({ form, set, errors }: { form: Branding; set: SetFn; err
             {txt("ogDescription", "Social description", { max: 200, hint: "Leave empty to use the meta description." })}
           </div>
         </div>
-      </Section>
-      <Section title="Contact & footer">
+      </SettingsGroup>
+      <SettingsGroup stacked id="contact" title="Contact & footer">
         <div className="grid gap-4 sm:grid-cols-2">
           {txt("supportEmail", "Support e-mail", { max: 200, type: "email", hint: "Shown on Contact, Help and legal pages. Leave empty to hide." })}
           {txt("contactPhone", "Public phone", { max: 30, placeholder: "+91 …" })}
           <div className="sm:col-span-2">{txt("contactAddress", "Public address", { max: 300, area: true })}</div>
           <div className="sm:col-span-2">{txt("footerText", "Footer copyright text", { max: 200, hint: "{year} and {company} are filled in automatically." })}</div>
         </div>
-      </Section>
+      </SettingsGroup>
+      <SettingsGroup stacked id="social" title="Social profiles" description="Shown as icons in the site footer. Only filled-in links appear; each must be an https link on that network's own site.">
+        <div className="grid gap-4 sm:grid-cols-2">
+          {SOCIAL_NETWORKS.map((n) => {
+            const k = `social.${n.id}`;
+            return (
+              <Field key={n.id} label={<span className="inline-flex items-center gap-2"><BrandIcon brand={n.id} className="h-3.5 w-3.5" /> {n.label}</span>} htmlFor={`b-${k}`} error={errors[k]}>
+                <Input id={`b-${k}`} type="url" inputMode="url" maxLength={300} placeholder={n.placeholder} value={form.social[n.id]} invalid={!!errors[k]}
+                  onChange={(e) => { set("social", { ...form.social, [n.id]: e.target.value }); }} />
+              </Field>
+            );
+          })}
+        </div>
+      </SettingsGroup>
     </>
   );
 }
@@ -193,15 +211,15 @@ function AppearanceFields({ form, set, errors }: { form: Branding; set: SetFn; e
   const lowContrast = /^#[0-9a-f]{6}$/i.test(form.primaryColor) && contrastRatio(form.primaryColor, onColor(form.primaryColor)) < 4.5;
   return (
     <>
-      <Section title="Colours" description="Used for buttons, links, focus rings and highlights. Button text switches between white and black automatically for readability.">
+      <SettingsGroup stacked id="colours" title="Colours" description="Used for buttons, links, focus rings and highlights. Button text switches between white and black automatically for readability.">
         <div className="grid gap-4 sm:grid-cols-2">
           <ColorField k="primaryColor" label="Primary brand colour" form={form} set={set} error={errors.primaryColor} />
           <ColorField k="accentColor" label="Secondary accent colour" form={form} set={set} error={errors.accentColor} />
         </div>
         {lowContrast && <Alert tone="warn" className="mt-4" icon={<AlertTriangle className="h-4 w-4" />}>Button text on this colour is hard to read (below 4.5 : 1). Pick a darker or lighter shade.</Alert>}
         <Button variant="ghost" size="sm" className="mt-3" onClick={() => { set("primaryColor", BRAND_DEFAULTS.primaryColor); set("accentColor", BRAND_DEFAULTS.accentColor); }}>Use default colours</Button>
-      </Section>
-      <Section title="Theme & header">
+      </SettingsGroup>
+      <SettingsGroup stacked id="theme" title="Theme & header">
         <div className="grid gap-5 sm:grid-cols-2">
           <div>
             <span className="label">Default theme for new visitors</span>
@@ -214,7 +232,7 @@ function AppearanceFields({ form, set, errors }: { form: Branding; set: SetFn; e
             {form.headerDisplay === "logo" && !form.logo && <p className="hint text-amber-600">Upload a logo below, otherwise the default mark is shown.</p>}
           </div>
         </div>
-      </Section>
+      </SettingsGroup>
     </>
   );
 }
@@ -224,11 +242,11 @@ const ASSET_LABEL: Record<AssetKind, string> = { logo: "Logo (light backgrounds)
 function AssetFields({ section, form, set, assets, rules, onUploaded }: { section: EditorSection; form: Branding; set: SetFn; assets: AssetRow[]; rules: Resp["rules"]; onUploaded: () => void }) {
   const kinds: AssetKind[] = section === "identity" ? ["favicon", "ogImage"] : ["logo", "logoDark"];
   return (
-    <Section title={section === "identity" ? "Favicon & social image" : "Logos"} description="PNG, JPEG, WebP or plain SVG. SVGs with scripts, event handlers or external references are rejected.">
+    <SettingsGroup stacked id={section === "identity" ? "images" : "logos"} title={section === "identity" ? "Favicon & social image" : "Logos"} description="PNG, JPEG, WebP or plain SVG. SVGs with scripts, event handlers or external references are rejected.">
       <div className="grid gap-5 sm:grid-cols-2">
         {kinds.map((k) => <AssetField key={k} kind={k} value={form[k]} onChange={(v) => set(k, v)} meta={assets.find((a) => a.storedName === form[k])} rule={rules[k]} onUploaded={onUploaded} />)}
       </div>
-    </Section>
+    </SettingsGroup>
   );
 }
 
@@ -305,7 +323,14 @@ export function BrandPreview({ b, dark }: { b: Branding; dark: boolean }) {
           </div>
           <p className="mt-3 text-[11px] text-accent">Accent colour example</p>
         </div>
-        <div className={cn("border-t px-4 py-3 text-[11px]", dark ? "border-zinc-800 text-zinc-500" : "border-zinc-200 text-zinc-500")}>{footerLine(b)}</div>
+        <div className={cn("flex items-center justify-between gap-3 border-t px-4 py-3 text-[11px]", dark ? "border-zinc-800 text-zinc-500" : "border-zinc-200 text-zinc-500")}>
+          <span className="min-w-0 truncate">{footerLine(b)}</span>
+          {socialLinks(b).length > 0 && (
+            <span className="flex shrink-0 gap-1.5" aria-label="Social links">
+              {socialLinks(b).map((l) => <BrandIcon key={l.id} brand={l.id} mono className="h-3.5 w-3.5" title={l.label} />)}
+            </span>
+          )}
+        </div>
       </div>
       <div className="overflow-hidden rounded-lg border border-slate-200 dark:border-slate-700">
         {b.ogImage ? <img src={assetUrl(b.ogImage)!} alt="" className="aspect-[1.91/1] w-full object-cover" /> : <div className="grid aspect-[1.91/1] place-items-center bg-slate-100 text-xs text-slate-400 dark:bg-slate-800">No social image</div>}

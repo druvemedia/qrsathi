@@ -377,9 +377,10 @@ try {
   const cleanSvg = await upload("logoDark", "dark.svg", Buffer.from(`<svg viewBox="0 0 200 60" xmlns="http://www.w3.org/2000/svg"><rect width="200" height="60" fill="#fff"/></svg>`), A, "image/svg+xml");
   check("plain SVG accepted for the dark logo", cleanSvg.status === 201, cleanSvg.data);
   const br = await call("GET", "/api/admin/branding", undefined, A);
-  const draft = { ...br.data.published, siteTitle: `Brand ${RUN} — test`, brandName: `Brand${RUN}`, primaryColor: "#0e7490", logo: logo.data.asset.storedName, logoDark: cleanSvg.data.asset.storedName, favicon: fav.data.asset.storedName };
+  const draft = { ...br.data.published, siteTitle: `Brand ${RUN} — test`, brandName: `Brand${RUN}`, primaryColor: "#0e7490", headerDisplay: "logo-name", logo: logo.data.asset.storedName, logoDark: cleanSvg.data.asset.storedName, favicon: fav.data.asset.storedName, social: { ...br.data.published.social, instagram: `https://www.instagram.com/brand${RUN}`, facebook: "" } };
   check("XSS in site title rejected", (await call("PUT", "/api/admin/branding", { ...draft, siteTitle: "<script>alert(1)</script>" }, A)).status === 400);
   check("CSS injection via colour rejected", (await call("PUT", "/api/admin/branding", { ...draft, primaryColor: "red}body{display:none" }, A)).status === 400);
+  check("social link on a look-alike host rejected", (await call("PUT", "/api/admin/branding", { ...draft, social: { ...draft.social, instagram: "https://instagram.com.evil.example/x" } }, A)).status === 400);
   check("foreign asset name rejected", (await call("PUT", "/api/admin/branding", { ...draft, logo: "0123456789abcdef0123456789abcdef.png" }, A)).status === 400);
   check("customers can't change branding (401)", (await call("PUT", "/api/admin/branding", draft, u0.jar)).status === 401);
   check("draft saved", (await call("PUT", "/api/admin/branding", draft, A)).status === 200);
@@ -388,7 +389,9 @@ try {
   check("publish", (await call("POST", "/api/admin/branding", { action: "publish" }, A)).status === 200);
   home = await (await fetch(BASE + "/")).text();
   check("published title in <title> via metadata", home.includes(`<title>Brand ${RUN} — test</title>`), home.match(/<title>[^<]*<\/title>/)?.[0]);
-  check("favicon and logos reference the uploads", home.includes(`/brand/${fav.data.asset.storedName}`) && home.includes(`/brand/${logo.data.asset.storedName}`));
+  check("favicon and logos reference the uploads", home.includes(`/brand/${fav.data.asset.storedName}`) && home.includes(`/brand/${logo.data.asset.storedName}`), `favicon ${home.includes(`/brand/${fav.data.asset.storedName}`)} logo ${home.includes(`/brand/${logo.data.asset.storedName}`)} refs ${(home.match(/\/brand\/[a-f0-9]{32}[.a-z]*/g) || []).join(",")}`);
+  check("configured social link shown in the footer, opening safely", new RegExp(`href="https://www.instagram.com/brand${RUN}" target="_blank" rel="noopener noreferrer"`).test(home));
+  check("unconfigured social networks stay hidden", !home.includes("on Facebook (opens in a new tab)"));
   check("brand colour applied as a CSS variable", home.includes(`--brand:${hexToHslTriplet("#0e7490")}`), home.match(/--brand:[^;]+/)?.[0]);
   const asset = await fetch(BASE + `/brand/${cleanSvg.data.asset.storedName}`);
   check("SVG asset served sandboxed with nosniff", asset.headers.get("content-type") === "image/svg+xml" && /sandbox/.test(asset.headers.get("content-security-policy") || "") && asset.headers.get("x-content-type-options") === "nosniff");

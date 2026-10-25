@@ -5,7 +5,8 @@ export function mailConfigured() {
 }
 
 /** Sends an email via SMTP. Without SMTP it logs to the console in development only. */
-export async function sendMail(msg: { to: string; subject: string; text: string }) {
+/** `replyTo` must already be a validated address (callers pass zod-checked input). */
+export async function sendMail(msg: { to: string; subject: string; text: string; replyTo?: string }) {
   if (!mailConfigured()) {
     if (process.env.NODE_ENV !== "production") {
       console.log(`\n[mail:dev] To: ${msg.to}\nSubject: ${msg.subject}\n${msg.text}\n`);
@@ -22,7 +23,7 @@ export async function sendMail(msg: { to: string; subject: string; text: string 
     auth: process.env.SMTP_USER ? { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS } : undefined,
   });
   try {
-    await transporter.sendMail({ from: process.env.MAIL_FROM || process.env.SMTP_USER, to: msg.to, subject: msg.subject, text: msg.text });
+    await transporter.sendMail({ from: process.env.MAIL_FROM || process.env.SMTP_USER, to: msg.to, replyTo: msg.replyTo, subject: msg.subject, text: msg.text });
     return true;
   } catch (e) {
     await logEvent("error", "mail.failed", e instanceof Error ? e.message : String(e));

@@ -1,7 +1,7 @@
 # QRSathi: QR code & barcode platform for India
 
 QRSathi is a full-stack web app:
-- **26 QR content types**, plus a dedicated **UPI payment QR** generator with printable standees.
+- **31 QR content types** (including TikTok, X, Telegram, Snapchat and Spotify profiles), plus a dedicated **UPI payment QR** generator with printable standees.
 - A design studio, **dynamic (editable) QR codes** with privacy-respecting scan analytics, and hosted landing pages.
 - A **barcode generator** (21 symbologies) and a **universal camera/image scanner** (QR, 1D and 2D codes).
 - **Products & inventory**: stock movements, barcode lookup, CSV/XLSX import and label printing.
@@ -66,7 +66,7 @@ Both use one accounts table but separate session cookies and separate authorisat
 | **Products & inventory** | Platform-wide aggregates only; customers' catalogues stay private. |
 | **Analytics, Subscriptions, Payments** | Aggregate activity; Razorpay subscriptions (cancel at period end or now); payment history with refunds. |
 | **Plans & pricing** | Create, edit, duplicate, publish, archive and reorder plans. Prices in minor units; entitlements enforced by the server; live preview; Razorpay plan sync ([docs/BILLING.md](docs/BILLING.md)). |
-| **Website branding / Appearance** | Titles, SEO and social text, contact details, logos (light and dark), favicon, social image, colours, default theme. Draft → preview → publish. |
+| **Website branding / Appearance** | Titles, SEO and social text, contact details, footer social profile links (each validated against that network's own domain; empty ones are hidden), logos (light and dark), favicon, social image, colours, default theme. Draft → preview → publish. |
 | **Payment gateway / Email** | Razorpay test and live credentials (encrypted, never shown again), read-only connection test, checkout switch. SMTP status and a test e-mail. |
 | **Security & audit** | Sign-in failures, administrator list with 2FA status, full audit log. |
 | **Site settings / System** | Branding and sign-up policy. Health, configuration flags (never secret values) and the application error log. |
@@ -96,7 +96,7 @@ The server validates its configuration at startup. In production it **refuses to
 - `DEMO_MODE` on;
 - a secret placed in a `NEXT_PUBLIC_*` variable.
 
-Optional integrations: Google sign-in, SMTP (password reset) and Razorpay (subscriptions). See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md#7-integrations).
+Optional integrations: Google sign-in, SMTP (password reset, and the public contact form — shown only when SMTP and a support e-mail are both set) and Razorpay (subscriptions). See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md#7-integrations).
 
 ## Tests
 
@@ -154,7 +154,7 @@ Backups: [docs/BACKUP-RECOVERY.md](docs/BACKUP-RECOVERY.md).
 | Area | Route | Key code |
 |---|---|---|
 | Homepage + quick generator | `/` | `src/components/home/quick-generator.tsx` |
-| Generator (26 types) | `/generator` | `src/lib/qr-types.ts`, `src/components/qr/workbench.tsx` |
+| Generator (31 types) | `/generator` | `src/lib/qr-types.ts`, `src/components/qr/workbench.tsx` |
 | Design studio | `/studio` | `src/components/qr/design-panel.tsx`, `src/lib/qr-render.ts` |
 | UPI payment QR + standee | `/upi` | `src/lib/upi.ts`, `src/app/(app)/upi/upi-tool.tsx` |
 | Barcodes | `/barcodes` | `src/lib/barcodes.ts`, `src/components/barcode/*` |

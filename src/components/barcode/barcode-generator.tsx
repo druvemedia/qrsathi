@@ -1,15 +1,15 @@
 "use client";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { CheckCircle2, ChevronDown, Download, FileSpreadsheet, Info, PackagePlus, Printer, XCircle } from "lucide-react";
-import { BARCODE_MAP, getBarcodeFormat, validateBarcode, type BarcodeFormatDef } from "@/lib/barcodes";
+import { Barcode, Boxes, CheckCircle2, ChevronDown, Download, FileSpreadsheet, Info, PackagePlus, Printer, Tag, XCircle } from "lucide-react";
+import { BARCODE_MAP, getBarcodeFormat, renderBarcodeSvg, validateBarcode, type BarcodeFormatDef } from "@/lib/barcodes";
 import { loadPrefs } from "@/lib/preferences";
 import { cn } from "@/lib/utils";
-import { Alert, Badge, Card, Disclosure, Field, Input, Modal, Segmented, Textarea, Button } from "@/components/ui";
+import { Alert, Badge, Disclosure, Field, Input, Modal, Segmented, Textarea, Button } from "@/components/ui";
 import { useApp } from "@/components/providers";
 import { trackDownload } from "@/components/qr/export-panel";
 import {
-  BarcodePreview, DEFAULT_BARCODE_STYLE, DEFAULT_LABEL, ExportButtons, GtinNotice, LabelDesigner, ScannableBadge, StyleControls, useBarcodeSvg,
+  DEFAULT_BARCODE_STYLE, DEFAULT_LABEL, ExportButtons, GtinNotice, LabelDesigner, ScannableBadge, StyleControls, useBarcodeSvg,
   type BarcodeStyle, type LabelSettings,
 } from "./barcode-ui";
 
@@ -33,18 +33,34 @@ const WHEN: Record<string, string> = {
 };
 const kindOf = (id: string): Kind => (GROUPS.product.common.includes(id) || GROUPS.product.more.includes(id) ? "product" : "custom");
 
-function FormatCard({ f, selected, onClick }: { f: BarcodeFormatDef; selected: boolean; onClick: () => void }) {
+/** Tile with a real miniature of the format, rendered from its example value. */
+function FormatTile({ f, selected, onClick }: { f: BarcodeFormatDef; selected: boolean; onClick: () => void }) {
+  const thumb = useMemo(() => {
+    try {
+      const v = validateBarcode(f.id, f.example);
+      return renderBarcodeSvg(f.id, v.ok ? v.value : f.example, { scale: 1, heightMm: 6, showText: false, margin: 2 });
+    } catch {
+      return "";
+    }
+  }, [f.id, f.example]);
   return (
-    <button type="button" onClick={onClick} aria-pressed={selected}
-      className={cn("flex flex-col items-start justify-start rounded-lg border p-3 text-left transition-colors",
-        selected ? "border-brand bg-brand/5 ring-1 ring-brand" : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800/60")}>
-      <span className="flex items-center gap-1.5 text-[13px] font-medium">{f.label}{!f.scannable && <Badge tone="amber">Generate only</Badge>}</span>
-      <span className="mt-0.5 block text-[11px] leading-snug text-slate-500 dark:text-slate-400">{WHEN[f.id]}</span>
+    <button type="button" onClick={onClick} aria-pressed={selected} title={WHEN[f.id]}
+      className={cn("group flex min-w-0 flex-col rounded-2xl border p-2.5 text-left transition duration-200",
+        selected ? "border-brand bg-brand/[0.06] ring-1 ring-brand" : "border-slate-200/80 bg-white hover:-translate-y-0.5 hover:shadow-card dark:border-slate-800 dark:bg-slate-900")}>
+      <span className="grid h-14 place-items-center rounded-xl bg-white px-2 ring-1 ring-inset ring-slate-100 dark:ring-0" aria-hidden>
+        {thumb && <span className={cn("block [&>svg]:h-auto [&>svg]:w-full", f.dims === "2d" ? "w-10" : "w-full max-w-[110px]")} dangerouslySetInnerHTML={{ __html: thumb }} />}
+      </span>
+      <span className="mt-2 flex items-center gap-1.5 truncate text-[13px] font-medium">{f.label}{!f.scannable && <Badge tone="amber">Generate only</Badge>}</span>
+      <span className="mt-0.5 line-clamp-1 text-[11px] text-slate-500 dark:text-slate-400">{WHEN[f.id]}</span>
     </button>
   );
 }
 
-const stepNo = (n: number) => <span className="grid h-5 w-5 shrink-0 place-items-center rounded-full bg-slate-900 text-[11px] font-semibold text-white dark:bg-white dark:text-slate-900">{n}</span>;
+const step = (n: number, label: string) => (
+  <span className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">
+    <span className="grid h-5 w-5 place-items-center rounded-full bg-slate-900 text-[10px] text-white dark:bg-white dark:text-slate-900">{n}</span>{label}
+  </span>
+);
 
 export function BarcodeGenerator() {
   const { user } = useApp();
@@ -57,6 +73,7 @@ export function BarcodeGenerator() {
   const [labelData, setLabelData] = useState({ name: "", variant: "", price: "", sku: "" });
   const [printOpen, setPrintOpen] = useState(false);
   const [mobileView, setMobileView] = useState<"edit" | "preview">("edit");
+  const [view, setView] = useState<"code" | "pack">("code");
 
   useEffect(() => {
     try {
@@ -80,56 +97,54 @@ export function BarcodeGenerator() {
   const v = useMemo(() => validateBarcode(format, raw), [format, raw]);
   const { svg, error } = useBarcodeSvg(format, v.ok ? v.value : null, style);
   const name = `${f.id}-${v.ok ? v.value : "barcode"}`;
+  const problem = error || (!v.ok && raw ? v.error : "");
 
   const chooseKind = (k: Kind) => {
     setKind(k);
     if (kindOf(format) !== k) { setFormat(GROUPS[k].common[0]); setMoreOpen(false); }
   };
 
+  const code = (cls = "") => (
+    <div className={cn("[&>svg]:h-auto [&>svg]:max-h-[300px] [&>svg]:w-full", cls)} dangerouslySetInnerHTML={{ __html: svg }} role="img" aria-label="Barcode preview" />
+  );
+
   return (
     <div className="space-y-4">
       <Segmented className="flex w-full lg:hidden [&>button]:flex-1" value={mobileView} onChange={setMobileView}
         options={[{ value: "edit", label: "Edit" }, { value: "preview", label: "Preview & download" }]} />
 
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_400px]">
-        <div className={cn("min-w-0 space-y-4", mobileView === "preview" && "hidden lg:block")}>
-          <Card>
-            <div className="flex flex-wrap items-center gap-3 px-5 pt-4">
-              {stepNo(1)}<h2 className="section-title">Choose a barcode type</h2>
-              <Segmented size="sm" className="ml-auto" value={kind} onChange={chooseKind}
-                options={[{ value: "product", label: "Product barcode" }, { value: "custom", label: "Custom barcode" }]} />
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(340px,420px)] xl:gap-8">
+        <div className={cn("min-w-0 space-y-6", mobileView === "preview" && "hidden lg:block")}>
+          <section aria-labelledby="bc-type-h">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+              <h2 id="bc-type-h">{step(1, "Barcode type")}</h2>
+              <Segmented size="sm" value={kind} onChange={chooseKind} options={[
+                { value: "product", label: <span className="flex items-center gap-1.5 px-1"><Tag className="h-3.5 w-3.5" aria-hidden /> Product</span> },
+                { value: "custom", label: <span className="flex items-center gap-1.5 px-1"><Barcode className="h-3.5 w-3.5" aria-hidden /> Custom</span> },
+              ]} />
             </div>
-            <div className="space-y-3 p-5">
-              <p className="text-xs text-slate-500 dark:text-slate-400">
-                {kind === "product" ? "Numeric codes printed on retail packs, books and cartons (GTIN family)." : "Your own text or numbers — SKUs, assets, tickets, documents."}
-              </p>
-              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                {GROUPS[kind].common.map((id) => <FormatCard key={id} f={BARCODE_MAP[id]} selected={format === id} onClick={() => setFormat(id)} />)}
-              </div>
-              <button type="button" onClick={() => setMoreOpen((m) => !m)} aria-expanded={moreOpen}
-                className="inline-flex items-center gap-1 text-xs font-medium text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white">
-                <ChevronDown className={cn("h-3.5 w-3.5 transition-transform", moreOpen && "rotate-180")} aria-hidden /> {moreOpen ? "Fewer formats" : `More formats (${GROUPS[kind].more.length})`}
-              </button>
-              {moreOpen && (
-                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                  {GROUPS[kind].more.map((id) => <FormatCard key={id} f={BARCODE_MAP[id]} selected={format === id} onClick={() => setFormat(id)} />)}
-                </div>
-              )}
+            <div key={kind} className="grid animate-fade-in grid-cols-2 gap-2 sm:grid-cols-4">
+              {GROUPS[kind].common.map((id) => <FormatTile key={id} f={BARCODE_MAP[id]} selected={format === id} onClick={() => setFormat(id)} />)}
+              {moreOpen && GROUPS[kind].more.map((id) => <FormatTile key={id} f={BARCODE_MAP[id]} selected={format === id} onClick={() => setFormat(id)} />)}
             </div>
-          </Card>
+            <button type="button" onClick={() => setMoreOpen((m) => !m)} aria-expanded={moreOpen}
+              className="mt-3 inline-flex items-center gap-1 text-xs font-medium text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white">
+              <ChevronDown className={cn("h-3.5 w-3.5 transition-transform", moreOpen && "rotate-180")} aria-hidden /> {moreOpen ? "Fewer formats" : `More formats (${GROUPS[kind].more.length})`}
+            </button>
+          </section>
 
-          <Card>
-            <div className="flex flex-wrap items-center gap-3 px-5 pt-4">
-              {stepNo(2)}<h2 className="section-title">Enter the {f.label} data</h2>
-              <span className="ml-auto"><ScannableBadge formatId={format} /></span>
+          <section aria-labelledby="bc-data-h">
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <h2 id="bc-data-h">{step(2, `${f.label} data`)}</h2>
+              <ScannableBadge formatId={format} />
             </div>
-            <div className="space-y-4 p-5">
+            <div className="space-y-4 rounded-3xl border border-slate-200 bg-white p-5 shadow-card dark:border-slate-800 dark:bg-slate-900 sm:p-6">
               <p className="text-xs text-slate-500 dark:text-slate-400">{f.description}</p>
               <Field label="Data to encode" htmlFor="bc-data" error={!v.ok && raw ? v.error : undefined}
                 hint={v.ok ? undefined : `Example: ${f.example}`}>
                 {f.dims === "2d"
                   ? <Textarea id="bc-data" rows={3} value={raw} placeholder={f.placeholder} onChange={(e) => setValues((s) => ({ ...s, [format]: e.target.value }))} invalid={!v.ok && !!raw} />
-                  : <Input id="bc-data" value={raw} placeholder={f.placeholder} onChange={(e) => setValues((s) => ({ ...s, [format]: e.target.value }))} invalid={!v.ok && !!raw} className="h-11 font-mono text-base" spellCheck={false} autoComplete="off" />}
+                  : <Input id="bc-data" value={raw} placeholder={f.placeholder} onChange={(e) => setValues((s) => ({ ...s, [format]: e.target.value }))} invalid={!v.ok && !!raw} className="h-12 font-mono text-base tracking-wider" spellCheck={false} autoComplete="off" />}
               </Field>
               {v.ok ? (
                 <div className="space-y-1">
@@ -144,32 +159,54 @@ export function BarcodeGenerator() {
                 <StyleControls style={style} onChange={setStyle} dims={f.dims} />
               </Disclosure>
             </div>
-          </Card>
+          </section>
           <Button variant="outline" className="w-full lg:hidden" onClick={() => { setMobileView("preview"); window.scrollTo({ top: 0, behavior: "smooth" }); }}>Preview & download</Button>
         </div>
 
         <div className={cn("space-y-4 self-start lg:sticky lg:top-20", mobileView === "edit" && "hidden lg:block")}>
-          <Card>
-            <div className="flex items-center gap-3 border-b border-slate-100 px-5 py-4 dark:border-slate-800">
-              {stepNo(3)}<h2 className="section-title">Preview & download</h2>
-              <Badge tone="violet" className="ml-auto">{f.label}</Badge>
+          <div className="flex items-center justify-between gap-3">
+            <h2>{step(3, "Preview & download")}</h2>
+            <Badge tone="violet">{f.label}</Badge>
+          </div>
+          <div className="stage relative overflow-hidden rounded-3xl">
+            <div className="grid min-h-[320px] place-items-center px-6 pb-16 pt-10">
+              {!svg ? (
+                <p className="max-w-xs rounded-2xl bg-white/95 px-4 py-3 text-center text-sm text-slate-600 shadow-sm dark:bg-slate-900/95 dark:text-slate-300">
+                  {problem ? <span className="text-rose-600 dark:text-rose-400">{problem}</span> : "Enter valid data to see the barcode"}
+                </p>
+              ) : view === "code" ? (
+                <div key="code" className="w-full max-w-[320px] animate-scale-in rounded-[1.5rem] bg-white p-5 shadow-pop ring-1 ring-black/5">{code()}</div>
+              ) : (
+                <div key="pack" className="relative w-full max-w-[280px] animate-scale-in [perspective:900px]" aria-hidden>
+                  <div className="relative aspect-[4/5] rounded-xl bg-gradient-to-br from-amber-100 to-amber-200 shadow-pop ring-1 ring-black/10 [transform:rotateY(-12deg)_rotateX(4deg)]">
+                    <div className="absolute inset-x-5 top-5 space-y-1.5">
+                      <div className="h-2 w-2/3 rounded-full bg-amber-900/25" /><div className="h-2 w-1/2 rounded-full bg-amber-900/15" />
+                    </div>
+                    <Boxes className="absolute left-5 top-14 h-10 w-10 text-amber-900/20" />
+                    <div className="absolute bottom-4 right-4 w-[58%] rounded-md bg-white p-2 shadow-sm">{code()}</div>
+                  </div>
+                </div>
+              )}
             </div>
-            <div className="space-y-4 p-5">
-              <BarcodePreview svg={svg} error={error || (!v.ok && raw ? v.error : "")} className="min-h-[220px]" />
-              <ExportButtons svg={svg} name={name} widthMm={style.widthMm} onExported={(fmt) => trackDownload(user, `${f.label} ${v.ok ? v.value : ""}`, fmt)} />
-              <p className="flex items-center gap-1.5 text-xs text-slate-500"><Download className="h-3.5 w-3.5" aria-hidden /> PNG at 300 DPI, {style.widthMm} mm wide. SVG is vector — best for printers and designers.</p>
-              <Button variant="secondary" className="w-full" size="lg" onClick={() => setPrintOpen(true)} disabled={!svg}>
-                <Printer className="h-4 w-4" /> Print labels
-              </Button>
+            <div className="absolute bottom-3 left-1/2 flex -translate-x-1/2 gap-0.5 rounded-full bg-white/80 p-1 shadow-sm ring-1 ring-black/5 backdrop-blur dark:bg-zinc-900/80 dark:ring-white/10" role="group" aria-label="Preview view">
+              {([["code", "Barcode"], ["pack", "On a pack"]] as const).map(([id, l]) => (
+                <button key={id} type="button" onClick={() => setView(id)} aria-pressed={view === id}
+                  className={cn("rounded-full px-3 py-1 text-xs font-medium transition-colors", view === id ? "bg-slate-900 text-white dark:bg-white dark:text-slate-900" : "text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white")}>{l}</button>
+              ))}
             </div>
-          </Card>
-          <div className="grid gap-2 sm:grid-cols-2">
+          </div>
+          <ExportButtons svg={svg} name={name} widthMm={style.widthMm} onExported={(fmt) => trackDownload(user, `${f.label} ${v.ok ? v.value : ""}`, fmt)} />
+          <p className="flex items-center gap-1.5 text-xs text-slate-500"><Download className="h-3.5 w-3.5" aria-hidden /> PNG at 300 DPI, {style.widthMm} mm wide. SVG is vector — best for printers and designers.</p>
+          <Button variant="secondary" className="w-full" size="lg" onClick={() => setPrintOpen(true)} disabled={!svg}>
+            <Printer className="h-4 w-4" /> Print labels
+          </Button>
+          <div className="flex flex-wrap gap-2">
             {v.ok && (
-              <Link href={`/products/new?barcode=${encodeURIComponent(v.value)}&format=${format}`} className="card flex items-center gap-2 p-3 text-sm font-medium hover:border-slate-300 dark:hover:border-slate-700">
-                <PackagePlus className="h-4 w-4 text-brand" aria-hidden /> Save as product
+              <Link href={`/products/new?barcode=${encodeURIComponent(v.value)}&format=${format}`} className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium transition hover:shadow-card dark:border-slate-800 dark:bg-slate-900">
+                <PackagePlus className="h-3.5 w-3.5 text-brand" aria-hidden /> Save as product
               </Link>
             )}
-            <Link href="/bulk?mode=barcode" className="card flex items-center gap-2 p-3 text-sm font-medium hover:border-slate-300 dark:hover:border-slate-700"><FileSpreadsheet className="h-4 w-4 text-brand" aria-hidden /> Bulk from CSV/Excel</Link>
+            <Link href="/bulk?mode=barcode" className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium transition hover:shadow-card dark:border-slate-800 dark:bg-slate-900"><FileSpreadsheet className="h-3.5 w-3.5 text-brand" aria-hidden /> Bulk from CSV/Excel</Link>
           </div>
           {f.id === "upce" && <Alert tone="info" icon={<Info className="h-4 w-4" />}>Only UPC-A numbers with enough zeros can be shown as UPC-E. If yours can&apos;t, use UPC-A.</Alert>}
         </div>

@@ -1,7 +1,7 @@
 "use client";
 import { CheckCircle2, Database, HardDrive, RefreshCw, Timer, XCircle } from "lucide-react";
-import { Alert, Badge, Button, FilterBar, LoadingSkeleton, SearchInput, Section, Segmented, StatCard } from "@/components/ui";
-import { DataTable, Pagination, fmtDateTime, fmtNum, useAdminData, useListQuery, type Column, type Paged } from "@/components/admin/data";
+import { Alert, Badge, Button, LoadingSkeleton, SearchInput, Section, Segmented } from "@/components/ui";
+import { DataTable, Pagination, fmtDateTime, fmtNum, useAdminData, useListQuery, type Column, type Paged, TableView, MetricStrip, StripStat } from "@/components/admin/data";
 
 function OnOff({ on, warnWhen }: { on: boolean; warnWhen?: boolean }) {
   return on
@@ -30,12 +30,12 @@ export function SystemView() {
     <div className="space-y-6">
       {error ? <Alert tone="error" title="Couldn't load system status">{error}</Alert> : loading || !s ? <LoadingSkeleton rows={6} /> : (
         <>
-          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-            <StatCard label="Database" value={s.database.ok ? "Healthy" : "Unreachable"} hint={`${s.database.provider} · ${s.database.latencyMs} ms`} icon={<Database />} tone={s.database.ok ? undefined : "warn"} />
-            <StatCard label="Upload storage" value={s.storage.ok ? "Writable" : "Not writable"} icon={<HardDrive />} tone={s.storage.ok ? undefined : "warn"} />
-            <StatCard label="Uptime" value={uptime(s.uptimeSec)} hint={`Node ${s.node}`} icon={<Timer />} />
-            <StatCard label="Environment" value={s.environment} hint={`App v${s.version}`} />
-          </div>
+          <MetricStrip>
+            <StripStat label="Database" value={s.database.ok ? "Healthy" : "Unreachable"} hint={`${s.database.provider} · ${s.database.latencyMs} ms`} icon={<Database />} tone={s.database.ok ? undefined : "warn"} />
+            <StripStat label="Upload storage" value={s.storage.ok ? "Writable" : "Not writable"} icon={<HardDrive />} tone={s.storage.ok ? undefined : "warn"} />
+            <StripStat label="Uptime" value={uptime(s.uptimeSec)} hint={`Node ${s.node}`} icon={<Timer />} />
+            <StripStat label="Environment" value={s.environment} hint={`App v${s.version}`} />
+          </MetricStrip>
 
           <div className="grid gap-6 lg:grid-cols-2">
             <Section title="Configuration" description="Set with environment variables — see .env.example and docs/DEPLOYMENT.md."
@@ -73,17 +73,15 @@ export function SystemView() {
         </>
       )}
 
-      <Section title="Application log" description="Warnings and errors. Messages are redacted when written.">
-        <FilterBar>
+      <TableView title="Application log" count="Warnings and errors. Messages are redacted when written."
+          toolbar={<>
           <Segmented size="sm" value={logs.state.filters.level || ""} onChange={(v) => logs.setFilter("level", v)}
             options={[{ value: "", label: "All" }, { value: "error", label: "Errors" }, { value: "warn", label: "Warnings" }, { value: "info", label: "Info" }]} />
-          <SearchInput value={logs.state.q} onChange={logs.setQ} placeholder="Search events" aria-label="Search log" className="w-full sm:w-64" />
-        </FilterBar>
-        <div className="mt-4">
+          <SearchInput value={logs.state.q} onChange={logs.setQ} placeholder="Search events" aria-label="Search log" className="sm:w-64" />
+          </>}
+          footer={logData.data && logData.data.total > 0 && <Pagination page={logData.data.page} pages={logData.data.pages} total={logData.data.total} pageSize={logData.data.pageSize} onPage={logs.setPage} onPageSize={logs.setPageSize} />}>
           <DataTable caption="Application log" columns={logCols} data={logData.data?.items} loading={logData.loading} error={logData.error} onRetry={logData.reload} empty={{ title: "No log entries" }} />
-          {logData.data && <Pagination page={logData.data.page} pages={logData.data.pages} total={logData.data.total} pageSize={logData.data.pageSize} onPage={logs.setPage} onPageSize={logs.setPageSize} />}
-        </div>
-      </Section>
+      </TableView>
     </div>
   );
 }

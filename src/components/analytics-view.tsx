@@ -87,7 +87,7 @@ export function AnalyticsView({ qrId, isUpi }: { qrId?: string; isUpi?: boolean 
       </div>
 
       <Card className="p-5">
-        <h2 className="font-display font-bold">Scans over time</h2>
+        <h2 className="font-serif text-lg font-medium">Scans over time</h2>
         <p className="text-xs text-slate-500">{grain === "day" ? "Per day" : grain === "week" ? "Per week (Mon–Sun)" : "Per month"} · UTC</p>
         <div className="mt-4">{data ? <TrendChart data={series} labelFormat={fmtLabel(grain)} /> : <Skeleton className="h-[260px]" />}</div>
       </Card>
@@ -100,13 +100,13 @@ export function AnalyticsView({ qrId, isUpi }: { qrId?: string; isUpi?: boolean 
         <div className="grid gap-6 md:grid-cols-2">
           {([["Devices", data?.devices], ["Browsers & apps", data?.browsers], ["Operating systems", data?.os], ["Countries", data?.countries]] as const).map(([title, rows]) => (
             <Card key={title} className="p-5">
-              <h3 className="mb-3 font-display font-bold">{title}</h3>
+              <h3 className="mb-3 font-serif text-lg font-medium">{title}</h3>
               {rows ? <RankBars data={rows as any} /> : <Skeleton className="h-40" />}
               {title === "Countries" && rows && rows.length === 0 && <p className="text-xs text-slate-400">Country is only available when hosted behind a CDN that provides it (e.g. Vercel, Cloudflare).</p>}
             </Card>
           ))}
           <Card className="p-5 md:col-span-2">
-            <h3 className="font-display font-bold">Time of day</h3>
+            <h3 className="font-serif text-lg font-medium">Time of day</h3>
             <p className="text-xs text-slate-500">Hour of scan (UTC; add 5:30 for IST)</p>
             <div className="mt-3">{data ? <ColumnChart data={data.hours} xKey="hour" yKey="count" tickFormat={(h) => `${h}:00`} /> : <Skeleton className="h-[200px]" />}</div>
           </Card>
@@ -115,7 +115,7 @@ export function AnalyticsView({ qrId, isUpi }: { qrId?: string; isUpi?: boolean 
 
       {!qrId && data && (
         <Card className="overflow-hidden">
-          <div className="p-5"><h3 className="font-display font-bold">By QR code</h3></div>
+          <div className="p-5"><h3 className="font-serif text-lg font-medium">By QR code</h3></div>
           {data.perQr.length === 0 ? (
             <div className="px-5 pb-6 text-sm text-slate-500">No dynamic QR codes yet. <Link href="/generator?type=dynamic" className="font-semibold text-brand">Create one</Link>.</div>
           ) : (

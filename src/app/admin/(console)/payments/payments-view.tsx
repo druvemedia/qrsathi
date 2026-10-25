@@ -1,6 +1,6 @@
 "use client";
-import { Alert, Badge, FilterBar, SearchInput, Section, Select, StatCard } from "@/components/ui";
-import { DataTable, Pagination, fmtDateTime, fmtNum, useAdminData, useListQuery, type Column, type Paged } from "@/components/admin/data";
+import { Alert, Badge, SearchInput, Select } from "@/components/ui";
+import { DataTable, Pagination, fmtDateTime, fmtNum, useAdminData, useListQuery, type Column, type Paged, TableView, MetricStrip, StripStat } from "@/components/admin/data";
 import { formatMoney } from "@/lib/plans";
 
 interface Row {
@@ -31,26 +31,24 @@ export function PaymentsView() {
     <div className="space-y-6">
       {data && !data.billingConfigured && !data.total && <Alert tone="info" title="No payments yet">Online checkout is off. Configure Razorpay under Payment gateway to accept payments.</Alert>}
       {data && (
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-          <StatCard label="Net collected (confirmed)" value={data.netCollected.length ? data.netCollected.map((n) => formatMoney(n.amount, n.currency)).join(" · ") : "—"} hint="Paid minus refunds" />
-          <StatCard label="Paid payments" value={fmtNum(count(data, "paid") + count(data, "partially_refunded"))} />
-          <StatCard label="Failed" value={fmtNum(count(data, "failed"))} tone={count(data, "failed") ? "warn" : undefined} />
-          <StatCard label="Refunded" value={fmtNum(count(data, "refunded") + count(data, "partially_refunded"))} />
-        </div>
+        <MetricStrip>
+          <StripStat label="Net collected (confirmed)" value={data.netCollected.length ? data.netCollected.map((n) => formatMoney(n.amount, n.currency)).join(" · ") : "—"} hint="Paid minus refunds" />
+          <StripStat label="Paid payments" value={fmtNum(count(data, "paid") + count(data, "partially_refunded"))} />
+          <StripStat label="Failed" value={fmtNum(count(data, "failed"))} tone={count(data, "failed") ? "warn" : undefined} />
+          <StripStat label="Refunded" value={fmtNum(count(data, "refunded") + count(data, "partially_refunded"))} />
+        </MetricStrip>
       )}
-      <Section title="Payment history" description={data ? `${fmtNum(data.total)} matching` : undefined}>
-        <FilterBar>
-          <SearchInput value={list.state.q} onChange={list.setQ} placeholder="Customer e-mail or pay_ id" aria-label="Search payments" className="w-full sm:w-64" />
-          <Select aria-label="Filter by status" value={list.state.filters.status || ""} onChange={(e) => list.setFilter("status", e.target.value)} className="w-auto">
+      <TableView title="Payment history" count={data ? `${fmtNum(data.total)} matching` : undefined}
+          toolbar={<>
+          <SearchInput value={list.state.q} onChange={list.setQ} placeholder="Customer e-mail or pay_ id" aria-label="Search payments" className="sm:w-64" />
+          <Select aria-label="Filter by status" value={list.state.filters.status || ""} onChange={(e) => list.setFilter("status", e.target.value)} className="sm:w-auto">
             <option value="">All statuses</option><option value="paid">Paid</option><option value="failed">Failed</option><option value="refunded">Refunded</option><option value="partially_refunded">Partially refunded</option><option value="created">Created (legacy link)</option>
           </Select>
-        </FilterBar>
-        <div className="mt-4">
+          </>}
+          footer={data && data.total > 0 && <Pagination page={data.page} pages={data.pages} total={data.total} pageSize={data.pageSize} onPage={list.setPage} onPageSize={list.setPageSize} />}>
           <DataTable caption="Payments" columns={columns} data={data?.items} loading={loading} error={error} onRetry={reload}
             sort={list.state.sort} order={list.state.order} onSort={list.toggleSort} empty={{ title: "No payments recorded" }} />
-          {data && <Pagination page={data.page} pages={data.pages} total={data.total} pageSize={data.pageSize} onPage={list.setPage} onPageSize={list.setPageSize} />}
-        </div>
-      </Section>
+      </TableView>
     </div>
   );
 }

@@ -240,7 +240,7 @@ export function ProductEditor({ id }: { id?: string }) {
               <div className="flex items-end justify-between">
                 <div>
                   <p className="text-sm text-slate-500">In stock</p>
-                  <p className="font-display text-4xl font-extrabold tabular-nums">{saved.stock}</p>
+                  <p className="font-serif text-4xl tabular-nums">{saved.stock}</p>
                 </div>
                 {saved.lowStock ? <Badge tone="amber">Low stock (≤ {saved.lowStockAt})</Badge> : <Badge tone="green">OK</Badge>}
               </div>
@@ -252,7 +252,7 @@ export function ProductEditor({ id }: { id?: string }) {
             </Card>
           )}
           <Card className="p-5">
-            <h2 className="mb-3 font-display text-base font-bold">Barcode & label</h2>
+            <h2 className="mb-3 font-serif text-lg font-medium">Barcode & label</h2>
             <BarcodePreview svg={svg} error={error || (primaryValid && !primaryValid.ok ? primaryValid.error : "")} placeholder="Add a barcode to preview the label" />
             <div className="mt-4">
               <LabelDesigner barcodeSvg={svg} data={labelData} settings={labelSettings} onSettings={setLabelSettings} name={form.sku || form.name || "product"} />
@@ -432,7 +432,7 @@ function StockHistory({ productId, refreshKey }: { productId: string; refreshKey
   useEffect(load, [load, refreshKey]);
   return (
     <Card className="overflow-hidden">
-      <div className="p-5 pb-3"><h2 className="font-display text-base font-bold">Activity history</h2></div>
+      <div className="p-5 pb-3"><h2 className="font-serif text-lg font-medium">Activity history</h2></div>
       {!items ? <Skeleton className="m-5 h-32" /> : items.length === 0 ? <p className="px-5 pb-5 text-sm text-slate-500">No activity yet.</p> : (
         <div className="max-h-[420px] overflow-auto">
           <table className="w-full text-sm">

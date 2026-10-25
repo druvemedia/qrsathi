@@ -1,8 +1,9 @@
 "use client";
 import { useState } from "react";
-import { CheckCircle2, CircleAlert, CircleDashed, Eye, EyeOff, KeyRound, Lock, PlugZap, ServerCog, XCircle } from "lucide-react";
+import { CheckCircle2, CircleAlert, CircleDashed, CreditCard, Eye, EyeOff, KeyRound, Lock, PlugZap, PowerOff, ServerCog, XCircle } from "lucide-react";
 import { toast } from "sonner";
-import { Alert, Badge, Button, ConfirmDialog, Field, Input, LoadingSkeleton, Section, Switch, Tabs } from "@/components/ui";
+import { Alert, Badge, Button, ConfirmDialog, Disclosure, Field, Input, LoadingSkeleton, Segmented, Switch } from "@/components/ui";
+import { SettingsGroup, SetupSteps, StatusHero } from "@/components/admin/settings-ui";
 import { fmtDateTime, useAdminApi, useAdminData } from "@/components/admin/data";
 import { useReauth, useUnsavedGuard } from "@/components/admin/guards";
 import { FetchError } from "@/lib/fetcher";
@@ -48,16 +49,19 @@ export function PaymentsConfig({ canEdit }: { canEdit: boolean }) {
   const active = data[data.mode];
 
   return (
-    <div className="max-w-4xl space-y-6">
-      <Section title="Razorpay checkout" description="Customers can subscribe online only when checkout is enabled and the active mode's credentials are verified.">
-        <div className="flex flex-wrap items-center gap-3">
-          <Badge tone={data.mode === "live" ? "rose" : "blue"}>{data.mode === "live" ? "Live mode" : "Test mode"}</Badge>
-          {data.checkoutReady ? <Badge tone="green"><CheckCircle2 className="h-3 w-3" /> Accepting payments</Badge> : <Badge tone="slate">Checkout off</Badge>}
-          <span className="text-xs text-slate-500">Active credentials: {STATUS[active.status].label.toLowerCase()}</span>
-        </div>
-        <div className="mt-4 grid gap-4 sm:grid-cols-2">
-          <Switch checked={data.enabled} disabled={!canEdit} onChange={(v) => setToggle({ enabled: v, mode: data.mode })}
-            label="Enable online checkout" description="Requires complete, verified credentials for the active mode." />
+    <div className="max-w-5xl">
+      <StatusHero tone={data.checkoutReady ? "green" : data.enabled ? "amber" : "slate"} icon={data.checkoutReady ? <CreditCard /> : <PowerOff />}
+        title={data.checkoutReady ? "Accepting payments" : data.enabled ? "Checkout enabled, not ready" : "Checkout off"}
+        detail={<>{data.mode === "live" ? "Live mode — real money" : "Test mode — no real money moves"} · active credentials {STATUS[active.status].label.toLowerCase()}</>}>
+        <Badge tone={data.mode === "live" ? "rose" : "blue"}>{data.mode === "live" ? "Live mode" : "Test mode"}</Badge>
+      </StatusHero>
+
+      <div className="mt-4">
+        <SettingsGroup id="checkout" title="Razorpay checkout" description="Customers can subscribe online only when checkout is enabled and the active mode's credentials are verified.">
+          <div className="rounded-2xl border border-slate-200/80 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+            <Switch checked={data.enabled} disabled={!canEdit} onChange={(v) => setToggle({ enabled: v, mode: data.mode })}
+              label="Enable online checkout" description="Requires complete, verified credentials for the active mode." />
+          </div>
           <div>
             <span className="label">Active mode</span>
             <div className="flex gap-2">
@@ -68,27 +72,41 @@ export function PaymentsConfig({ canEdit }: { canEdit: boolean }) {
             </div>
             <p className="hint">Test mode uses Razorpay test keys: no real money moves.</p>
           </div>
-        </div>
-      </Section>
+        </SettingsGroup>
 
-      {!data.storageAvailable && (
-        <Alert tone="info" icon={<ServerCog className="h-4 w-4" />} title="Credentials are managed on the server">
-          <code>SETTINGS_ENCRYPTION_KEY</code> isn&apos;t configured, so secrets can&apos;t be stored in the database. Set <code>RAZORPAY_KEY_ID</code>, <code>RAZORPAY_KEY_SECRET</code> and <code>RAZORPAY_WEBHOOK_SECRET</code> as environment variables (recommended for production), or set a 32+ character <code>SETTINGS_ENCRYPTION_KEY</code> to enter them here.
-        </Alert>
-      )}
+        <SettingsGroup id="progress" title="Setup progress" description={`For the active (${data.mode}) mode. Every step reflects stored state.`}>
+          <SetupSteps steps={[
+            { label: "Key ID and Key Secret saved", done: !!active.keyId && active.keySecretConfigured, hint: "Enter them under Credentials below, or as environment variables." },
+            { label: "Connection test passed", done: active.status === "verified", hint: "Press “Test connection”. It only lists plans; nothing is created or charged." },
+            { label: "Webhook secret saved", done: active.webhookSecretConfigured, hint: "Without it, payments can't be confirmed." },
+            { label: "Signed webhook received", done: !!active.lastWebhookAt, hint: "Arrives after Razorpay sends the first event to /api/billing/webhook." },
+            { label: "Checkout enabled", done: data.enabled },
+          ]} />
+        </SettingsGroup>
 
-      <Tabs value={tab} onChange={setTab} tabs={(["test", "live"] as const).map((m) => ({ value: m, label: <span className="inline-flex items-center gap-2">{m === "test" ? "Test credentials" : "Live credentials"} <Badge tone={STATUS[data[m].status].tone}>{STATUS[data[m].status].label}</Badge></span> }))} />
-      <ModeCredentials key={tab} view={data[tab]} storageAvailable={data.storageAvailable} canEdit={canEdit} run={run} onSaved={reload} />
+        {!data.storageAvailable && (
+          <Alert tone="info" icon={<ServerCog className="h-4 w-4" />} title="Credentials are managed on the server" className="mb-2">
+            <code>SETTINGS_ENCRYPTION_KEY</code> isn&apos;t configured, so secrets can&apos;t be stored in the database. Set <code>RAZORPAY_KEY_ID</code>, <code>RAZORPAY_KEY_SECRET</code> and <code>RAZORPAY_WEBHOOK_SECRET</code> as environment variables (recommended for production), or set a 32+ character <code>SETTINGS_ENCRYPTION_KEY</code> to enter them here.
+          </Alert>
+        )}
 
-      <Section title="Setting up Razorpay">
-        <ol className="list-decimal space-y-2 pl-5 text-sm text-slate-600 dark:text-slate-300">
-          <li>In the Razorpay Dashboard choose <strong>Test</strong> or <strong>Live</strong> mode, then <em>Account &amp; Settings → API keys</em> → generate a key. Copy the Key ID and Key Secret (the secret is shown once).</li>
-          <li>Under <em>Webhooks</em>, add <code className="break-all">{(process.env.NEXT_PUBLIC_APP_URL || "https://your-domain")}/api/billing/webhook</code> with a secret of your choice. Select the events <code>subscription.*</code>, <code>payment.failed</code> and <code>refund.processed</code>.</li>
-          <li>Enter the three values here (or as environment variables), then press <strong>Test connection</strong>. The test only lists plans; it creates nothing and charges nothing.</li>
-          <li>Go to <em>Plans &amp; pricing</em> and <strong>Sync with Razorpay</strong> for each paid plan, then enable checkout.</li>
-          <li>Do a complete test purchase in test mode before switching to live.</li>
-        </ol>
-      </Section>
+        <SettingsGroup id="credentials" title="Credentials" description="Secrets are encrypted and never shown again after saving."
+          actions={<Segmented size="sm" value={tab} onChange={setTab} options={(["test", "live"] as const).map((m) => ({ value: m, label: <span className="inline-flex items-center gap-1.5">{m === "test" ? "Test" : "Live"}<span className={`h-1.5 w-1.5 rounded-full ${data[m].status === "verified" ? "bg-emerald-500" : data[m].status === "invalid" ? "bg-rose-500" : "bg-slate-300 dark:bg-slate-600"}`} aria-hidden /><span className="sr-only">({STATUS[data[m].status].label})</span></span> }))} />}>
+          <ModeCredentials key={tab} view={data[tab]} storageAvailable={data.storageAvailable} canEdit={canEdit} run={run} onSaved={reload} />
+        </SettingsGroup>
+
+        <SettingsGroup id="guide" title="Setting up Razorpay" description="Five steps, test mode first.">
+          <Disclosure title="Step-by-step guide" description="API keys, webhook, plan sync, test purchase">
+            <ol className="list-decimal space-y-2 pl-5 text-sm text-slate-600 dark:text-slate-300">
+              <li>In the Razorpay Dashboard choose <strong>Test</strong> or <strong>Live</strong> mode, then <em>Account &amp; Settings → API keys</em> → generate a key. Copy the Key ID and Key Secret (the secret is shown once).</li>
+              <li>Under <em>Webhooks</em>, add <code className="break-all">{(process.env.NEXT_PUBLIC_APP_URL || "https://your-domain")}/api/billing/webhook</code> with a secret of your choice. Select the events <code>subscription.*</code>, <code>payment.failed</code> and <code>refund.processed</code>.</li>
+              <li>Enter the three values here (or as environment variables), then press <strong>Test connection</strong>. The test only lists plans; it creates nothing and charges nothing.</li>
+              <li>Go to <em>Plans &amp; pricing</em> and <strong>Sync with Razorpay</strong> for each paid plan, then enable checkout.</li>
+              <li>Do a complete test purchase in test mode before switching to live.</li>
+            </ol>
+          </Disclosure>
+        </SettingsGroup>
+      </div>
 
       <ConfirmDialog open={!!toggle} onClose={() => setToggle(null)} tone={toggle?.mode === "live" && toggle.enabled ? "danger" : "primary"}
         title={toggle?.enabled ? `Enable checkout in ${toggle.mode} mode?` : toggle && toggle.mode !== data.mode ? `Switch to ${toggle.mode} mode?` : "Disable checkout?"}
@@ -164,9 +182,14 @@ function ModeCredentials({ view, storageAvailable, canEdit, run, onSaved }: { vi
   };
 
   return (
-    <Section title={`${view.mode === "test" ? "Test" : "Live"} credentials`}
-      description={envManaged ? "Set by environment variables on the server — change them there." : view.source === "database" ? "Stored encrypted in the database." : "Not configured yet."}
-      actions={<Badge tone={S.tone}><S.icon className="h-3 w-3" /> {S.label}</Badge>}>
+    <div className="animate-fade-in rounded-2xl border border-slate-200/80 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <h3 className="text-sm font-semibold">{view.mode === "test" ? "Test" : "Live"} credentials</h3>
+          <p className="text-xs text-slate-500">{envManaged ? "Set by environment variables on the server — change them there." : view.source === "database" ? "Stored encrypted in the database." : "Not configured yet."}</p>
+        </div>
+        <Badge tone={S.tone}><S.icon className="h-3 w-3" /> {S.label}</Badge>
+      </div>
       <div className="space-y-4">
         {envManaged && <Alert tone="info" icon={<Lock className="h-4 w-4" />}>Environment variables take precedence over values entered here.</Alert>}
         <Field label="Key ID" htmlFor={`${view.mode}-keyId`} error={errors.keyId} hint={`Starts with rzp_${view.mode}_. Not secret (it's sent to Razorpay Checkout in the browser).`}>
@@ -200,6 +223,6 @@ function ModeCredentials({ view, storageAvailable, canEdit, run, onSaved }: { vi
         Checkout for {view.mode} mode stops working until a new secret is saved and verified.
       </ConfirmDialog>
       {guard}
-    </Section>
+    </div>
   );
 }

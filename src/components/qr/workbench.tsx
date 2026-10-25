@@ -11,16 +11,16 @@ import { TEMPLATES } from "@/lib/templates";
 import { loadPrefs } from "@/lib/preferences";
 import { appUrl, cn } from "@/lib/utils";
 import { api } from "@/lib/fetcher";
-import { Alert, Badge, Button, Card, Field, Input, Modal, Segmented, Select, Spinner, Switch, Tabs } from "@/components/ui";
+import { Alert, Badge, Button, Field, Input, Modal, Segmented, Select, Spinner, Switch } from "@/components/ui";
 import { useApp } from "@/components/providers";
 import { HostedPage } from "@/components/hosted-page";
-import { QrPreview } from "./preview";
+import { PreviewStage } from "./preview-stage";
 import { TypeForm } from "./type-form";
 import { DesignPanel } from "./design-panel";
 import { ExportPanel } from "./export-panel";
 import { SaveDialog, type SavedQr } from "./save-dialog";
 import { CodeTypeSelector } from "./code-type-selector";
-import { TypeIcon } from "@/components/icon";
+import { TypeGlyph } from "@/components/brand-icon";
 
 export const DRAFT_KEY = "qrsathi:draft:v1";
 const DEFAULT_CAPTIONS = new Set(QR_TYPES.map((t) => t.caption).filter(Boolean) as string[]);
@@ -213,16 +213,21 @@ export function Workbench({ mode = "generator" }: { mode?: "generator" | "studio
   if (loading) return <div className="grid min-h-[50vh] place-items-center"><Spinner className="h-8 w-8" /></div>;
 
   const saveLabel = project ? (project.isDynamic ? "Update" : "Save changes") : hosted ? "Publish page" : isDyn ? "Create dynamic QR" : "Save";
-  const stepNo = (n: number) => <span className="grid h-5 w-5 shrink-0 place-items-center rounded-full bg-slate-900 text-[11px] font-semibold text-white dark:bg-white dark:text-slate-900">{n}</span>;
   const showTypeStep = mode === "generator" && !project;
+  const step = (n: number, label: string) => (
+    <span className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">
+      {showTypeStep && <span className="grid h-5 w-5 place-items-center rounded-full bg-slate-900 text-[10px] text-white dark:bg-white dark:text-slate-900">{n}</span>}
+      {label}
+    </span>
+  );
 
   return (
     <div className="space-y-4">
       <Segmented className="flex w-full lg:hidden [&>button]:flex-1" value={mobileView} onChange={setMobileView}
         options={[{ value: "edit", label: "Edit" }, { value: "preview", label: "Preview & download" }]} />
 
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_380px]">
-        <div className={cn("min-w-0 space-y-4", mobileView === "preview" && "hidden lg:block")}>
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(340px,420px)] xl:gap-8">
+        <div className={cn("min-w-0 space-y-6", mobileView === "preview" && "hidden lg:block")}>
           {project && (
             <Alert tone={project.isDynamic ? "success" : "info"} icon={<PencilLine className="h-4 w-4" />}
               title={<>Editing “{project.name}” {project.isDynamic && <Badge tone="green" className="ml-1">{project.isHosted ? "Hosted page" : "Dynamic"}</Badge>}</>}>
@@ -238,39 +243,37 @@ export function Workbench({ mode = "generator" }: { mode?: "generator" | "studio
           )}
 
           {showTypeStep && (
-            <Card>
-              <div className="flex items-center gap-3 px-5 py-4">
-                {stepNo(1)}
-                <h2 className="section-title">Choose a code type</h2>
-                {!pickerOpen && (
-                  <>
-                    <span className="ml-1 inline-flex min-w-0 items-center gap-1.5 rounded-md bg-slate-100 px-2 py-1 text-xs font-medium dark:bg-slate-800">
-                      <TypeIcon name={type.icon} className="h-3.5 w-3.5" aria-hidden /> <span className="truncate">{type.label}</span>
-                    </span>
-                    <Button size="sm" variant="ghost" className="ml-auto" onClick={() => setPickerOpen(true)}>Change</Button>
-                  </>
-                )}
+            <section aria-labelledby="qr-type-h">
+              <div className="mb-3 flex items-center gap-3">
+                <h2 id="qr-type-h">{step(1, "What should it open?")}</h2>
               </div>
-              {pickerOpen && (
-                <div className="border-t border-slate-100 px-5 pb-5 pt-4 dark:border-slate-800">
-                  <CodeTypeSelector value={type.id} onChange={(id) => { changeType(id); setPickerOpen(false); }} />
-                </div>
+              {pickerOpen ? (
+                <CodeTypeSelector value={type.id} onChange={(id) => { changeType(id); setPickerOpen(false); }} />
+              ) : (
+                <button type="button" onClick={() => setPickerOpen(true)}
+                  className="group flex w-full items-center gap-4 rounded-2xl border border-slate-200 bg-white p-3 pr-4 text-left transition hover:border-slate-300 hover:shadow-card dark:border-slate-800 dark:bg-slate-900 dark:hover:border-slate-700">
+                  <TypeGlyph brand={type.brand} icon={type.icon} size="lg" />
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-base font-semibold">{type.label}</span>
+                    <span className="block truncate text-xs text-slate-500 dark:text-slate-400">{type.description}</span>
+                  </span>
+                  <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700 transition group-hover:bg-slate-900 group-hover:text-white dark:bg-slate-800 dark:text-slate-200 dark:group-hover:bg-white dark:group-hover:text-slate-900">Change type</span>
+                </button>
               )}
-            </Card>
+            </section>
           )}
 
-          <Card>
-            <div className="flex items-center gap-3 px-5 pt-4">
-              {showTypeStep && stepNo(2)}
-              <h2 className="section-title">{showTypeStep ? "Enter details & customise" : "Content & design"}</h2>
+          <section aria-labelledby="qr-edit-h">
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <h2 id="qr-edit-h">{step(2, showTypeStep ? "Details & style" : "Content & design")}</h2>
+              <Segmented size="sm" value={tab} onChange={setTab} options={[
+                { value: "content", label: <span className="flex items-center gap-1.5 px-1"><TypeIcon2 className="h-3.5 w-3.5" aria-hidden /> Content</span> },
+                { value: "design", label: <span className="flex items-center gap-1.5 px-1"><Palette className="h-3.5 w-3.5" aria-hidden /> Style</span> },
+              ]} />
             </div>
-            <Tabs className="mt-2 px-3" value={tab} onChange={setTab} tabs={[
-              { value: "content", label: "Content", icon: <TypeIcon2 className="h-4 w-4" /> },
-              { value: "design", label: "Design", icon: <Palette className="h-4 w-4" /> },
-            ]} />
-            <div className="p-5">
+            <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-card dark:border-slate-800 dark:bg-slate-900 sm:p-6">
               {tab === "content" ? (
-                <div className="space-y-5">
+                <div key="content" className="animate-fade-in space-y-5">
                   {(mode === "studio" || project) && (
                     <Field label="QR type">
                       <Select value={type.id} onChange={(e) => changeType(e.target.value)} disabled={!!project}>
@@ -279,13 +282,15 @@ export function Workbench({ mode = "generator" }: { mode?: "generator" | "studio
                     </Field>
                   )}
                   {project && <Field label="Name"><Input value={name} maxLength={100} onChange={(e) => setName(e.target.value)} /></Field>}
-                  <div className="flex items-start gap-3">
-                    <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-brand/10 text-brand"><TypeIcon name={type.icon} className="h-4 w-4" aria-hidden /></span>
-                    <div>
-                      <h3 className="text-sm font-semibold">{type.label}</h3>
-                      <p className="text-xs text-slate-500 dark:text-slate-400">{type.description}</p>
+                  {(mode === "studio" || project) && (
+                    <div className="flex items-center gap-3">
+                      <TypeGlyph brand={type.brand} icon={type.icon} />
+                      <div>
+                        <h3 className="text-sm font-semibold">{type.label}</h3>
+                        <p className="text-xs text-slate-500 dark:text-slate-400">{type.description}</p>
+                      </div>
                     </div>
-                  </div>
+                  )}
                   {type.id === "upi" && (
                     <Alert tone="info" icon={<Info className="h-4 w-4" />}>
                       For printable standees, payment instructions and UPI ID tools use the <Link href="/upi" className="font-medium underline">UPI Payment QR</Link> page.
@@ -303,7 +308,7 @@ export function Workbench({ mode = "generator" }: { mode?: "generator" | "studio
                       Encodes a short link on this site that redirects to your URL. Edit the destination later, pause it, and see scan analytics.
                     </Alert>
                   ) : type.dynamicCapable ? (
-                    <div className="rounded-lg border border-slate-200 p-4 dark:border-slate-800">
+                    <div className="rounded-2xl bg-slate-50 p-4 dark:bg-slate-800/50">
                       <Switch checked={dynamic} onChange={setDynamic} disabled={!!project}
                         label={<>Dynamic QR {!user && <Badge tone="brand" className="ml-1">Free account</Badge>}</>}
                         description="Short link with editable destination and scan analytics. Static QR codes store the link directly and never change." />
@@ -311,48 +316,46 @@ export function Workbench({ mode = "generator" }: { mode?: "generator" | "studio
                   ) : (
                     <p className="text-xs text-slate-500">Static QR — the content is stored inside the code itself. It works offline and never expires.</p>
                   )}
+                  <button type="button" onClick={() => setTab("design")} className="inline-flex items-center gap-1.5 text-sm font-medium text-brand hover:underline">
+                    <Palette className="h-4 w-4" aria-hidden /> Next: colours, logo & frame
+                  </button>
                 </div>
               ) : (
-                <DesignPanel design={design} onChange={setDesign} compact={mode === "generator"} />
+                <div key="design" className="animate-fade-in">
+                  <DesignPanel design={design} onChange={setDesign} compact={mode === "generator"} />
+                </div>
               )}
             </div>
-          </Card>
+          </section>
           <Button variant="outline" className="w-full lg:hidden" onClick={() => { setMobileView("preview"); window.scrollTo({ top: 0, behavior: "smooth" }); }}>
             <Eye className="h-4 w-4" /> Preview & download
           </Button>
         </div>
 
         <div className={cn("space-y-4 self-start lg:sticky lg:top-20", mobileView === "edit" && "hidden lg:block")}>
-          <Card>
-            <div className="flex items-center gap-3 border-b border-slate-100 px-5 py-4 dark:border-slate-800">
-              {showTypeStep && stepNo(3)}
-              <h2 className="section-title">Preview, test & download</h2>
-              <Badge tone={isDyn ? "violet" : "slate"} className="ml-auto">{hosted ? "Hosted page" : isDyn ? "Dynamic" : "Static"}</Badge>
+          <div className="flex items-center justify-between gap-3">
+            <h2>{step(showTypeStep ? 3 : 1, "Preview & download")}</h2>
+            <Badge tone={isDyn ? "violet" : "slate"}>{hosted ? "Hosted page" : isDyn ? "Dynamic" : "Static"}</Badge>
+          </div>
+          <PreviewStage payload={payload} design={design} title={displayName} invalid={!validation.ok && (showErrors || !lastGood.current)}
+            placeholderNote={unsaved ? `Preview — the final QR encodes your own short link after you ${hosted ? "publish" : "create"} it.` : undefined} />
+          {project?.isDynamic && <ShortLink url={project.payload} qrId={project.id} />}
+          {unsaved ? (
+            <Button className="w-full" size="lg" onClick={onSave} loading={saving}><Save className="h-4 w-4" /> {saveLabel}</Button>
+          ) : (
+            <div className="grid grid-cols-3 gap-2">
+              <Button variant="outline" size="sm" onClick={copyCode} disabled={!!exportBlock}><Copy className="h-3.5 w-3.5" /> Copy</Button>
+              <Button variant="outline" size="sm" onClick={onSave} loading={saving} title={saveLabel}><Save className="h-3.5 w-3.5" /> {project ? "Update" : "Save"}</Button>
+              <Button variant="outline" size="sm" onClick={testScan} loading={testing} disabled={!payload}><ScanLine className="h-3.5 w-3.5" /> Test scan</Button>
             </div>
-            <div className="p-5">
-              <QrPreview payload={payload} design={design} invalid={!validation.ok && (showErrors || !lastGood.current)}
-                placeholderNote={unsaved ? `Preview — the final QR encodes your own short link after you ${hosted ? "publish" : "create"} it.` : undefined} />
-              {project?.isDynamic && <ShortLink url={project.payload} qrId={project.id} />}
-              {unsaved ? (
-                <Button className="mt-4 w-full" onClick={onSave} loading={saving}><Save className="h-4 w-4" /> {saveLabel}</Button>
-              ) : (
-                <div className="mt-4 grid grid-cols-3 gap-2">
-                  <Button variant="outline" size="sm" onClick={copyCode} disabled={!!exportBlock}><Copy className="h-3.5 w-3.5" /> Copy</Button>
-                  <Button variant="outline" size="sm" onClick={onSave} loading={saving} title={saveLabel}><Save className="h-3.5 w-3.5" /> {project ? "Update" : "Save"}</Button>
-                  <Button variant="outline" size="sm" onClick={testScan} loading={testing} disabled={!payload}><ScanLine className="h-3.5 w-3.5" /> Test scan</Button>
-                </div>
-              )}
+          )}
+          <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-card dark:border-slate-800 dark:bg-slate-900">
+            <div className="mb-4 flex items-center gap-2">
+              <Download className="h-4 w-4 text-slate-400" aria-hidden /><h3 className="section-title">Download</h3>
             </div>
-          </Card>
-          <Card>
-            <div className="flex items-center gap-2 border-b border-slate-100 px-5 py-4 dark:border-slate-800">
-              <Download className="h-4 w-4 text-slate-400" aria-hidden /><h2 className="section-title">Download</h2>
-            </div>
-            <div className="p-5">
-              <ExportPanel payload={payload} design={design} name={displayName} qrId={project?.id} disabledReason={exportBlock}
-                posterDefaults={{ headline: design.frameText || "Scan me", title: displayName }} />
-            </div>
-          </Card>
+            <ExportPanel payload={payload} design={design} name={displayName} qrId={project?.id} disabledReason={exportBlock}
+              posterDefaults={{ headline: design.frameText || "Scan me", title: displayName }} />
+          </div>
         </div>
       </div>
 

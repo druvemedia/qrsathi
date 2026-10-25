@@ -5,7 +5,8 @@
 /*
  * QRSathi design tokens
  * Colour: neutral zinc surfaces + indigo primary (violet accent, used sparingly).
- * Radius: controls 8px (rounded-lg), cards 12px (rounded-xl), dialogs 16px (rounded-2xl).
+ * Radius: controls 8px (rounded-lg), cards 16px (rounded-2xl), stages and editors 24px (rounded-3xl).
+ * Type: Inter for UI; Fraunces (font-serif) for page titles and headlines.
  * Height: controls 36px (sm 32px, lg 44px). Spacing on a 4px grid.
  */
 :root {
@@ -52,7 +53,7 @@
 
 @layer components {
   .card {
-    @apply rounded-xl border border-slate-200 bg-white shadow-card dark:border-slate-800 dark:bg-slate-900 dark:shadow-none;
+    @apply rounded-2xl border border-slate-200/80 bg-white shadow-card dark:border-slate-800 dark:bg-slate-900 dark:shadow-none;
   }
   .input {
     @apply block h-9 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 placeholder:text-slate-400 transition-colors focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:opacity-70 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500 dark:disabled:bg-slate-900;
@@ -90,6 +91,32 @@
     background-size: 16px 16px;
     background-position: 0 0, 0 8px, 8px -8px, -8px 0;
   }
+  /* Preview stage: soft brand glow over a fine dot grid. */
+  .stage {
+    background-color: #f1f1f3;
+    background-image: radial-gradient(60% 55% at 50% 40%, hsl(var(--brand) / 0.16), transparent 70%),
+      radial-gradient(circle at 1px 1px, rgb(0 0 0 / 0.07) 1px, transparent 0);
+    background-size: 100% 100%, 16px 16px;
+  }
+  .dark .stage {
+    background-color: #141417;
+    background-image: radial-gradient(60% 55% at 50% 40%, hsl(var(--brand) / 0.22), transparent 70%),
+      radial-gradient(circle at 1px 1px, rgb(255 255 255 / 0.06) 1px, transparent 0);
+  }
+  .dot-grid {
+    background-image: radial-gradient(circle at 1px 1px, rgb(0 0 0 / 0.06) 1px, transparent 0);
+    background-size: 18px 18px;
+  }
+  .dark .dot-grid {
+    background-image: radial-gradient(circle at 1px 1px, rgb(255 255 255 / 0.05) 1px, transparent 0);
+  }
+  .scan-line {
+    animation: scan-line 2.4s ease-in-out infinite alternate;
+  }
+  @keyframes scan-line {
+    from { transform: translateY(0); }
+    to { transform: translateY(156px); }
+  }
   .scrollbar-thin {
     scrollbar-width: thin;
   }
@@ -115,5 +142,12 @@
   *, *::before, *::after {
     animation-duration: 0.01ms !important;
     transition-duration: 0.01ms !important;
+  }
+  /* Looping decorations would flicker at 0.01ms: hide them instead. */
+  .scan-line, .animate-float {
+    animation: none !important;
+  }
+  .scan-line {
+    display: none;
   }
 }

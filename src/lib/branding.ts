@@ -9,6 +9,19 @@ import { z } from "zod";
 export const ASSET_KINDS = ["logo", "logoDark", "favicon", "ogImage"] as const;
 export type AssetKind = (typeof ASSET_KINDS)[number];
 
+/** Social profiles that can be linked from the site footer, with the hosts each link must use. */
+export const SOCIAL_NETWORKS = [
+  { id: "instagram", label: "Instagram", hosts: ["instagram.com"], placeholder: "https://instagram.com/yourbrand" },
+  { id: "facebook", label: "Facebook", hosts: ["facebook.com", "fb.com"], placeholder: "https://facebook.com/yourbrand" },
+  { id: "x", label: "X (Twitter)", hosts: ["x.com", "twitter.com"], placeholder: "https://x.com/yourbrand" },
+  { id: "linkedin", label: "LinkedIn", hosts: ["linkedin.com"], placeholder: "https://www.linkedin.com/company/yourbrand" },
+  { id: "youtube", label: "YouTube", hosts: ["youtube.com", "youtu.be"], placeholder: "https://www.youtube.com/@yourbrand" },
+  { id: "whatsapp", label: "WhatsApp", hosts: ["wa.me", "whatsapp.com"], placeholder: "https://wa.me/919876543210" },
+  { id: "telegram", label: "Telegram", hosts: ["t.me", "telegram.me"], placeholder: "https://t.me/yourbrand" },
+  { id: "github", label: "GitHub", hosts: ["github.com"], placeholder: "https://github.com/yourorg" },
+] as const;
+export type SocialId = (typeof SOCIAL_NETWORKS)[number]["id"];
+
 export interface Branding {
   brandName: string;
   siteTitle: string;
@@ -31,6 +44,8 @@ export interface Branding {
   logoDark: string | null;
   favicon: string | null;
   ogImage: string | null;
+  /** Public profile URLs; empty strings are hidden. Never pre-filled. */
+  social: Record<SocialId, string>;
 }
 
 export const BRAND_DEFAULTS: Branding = {
@@ -55,6 +70,7 @@ export const BRAND_DEFAULTS: Branding = {
   logoDark: null,
   favicon: null,
   ogImage: null,
+  social: Object.fromEntries(SOCIAL_NETWORKS.map((n) => [n.id, ""])) as Record<SocialId, string>,
 };
 
 // No markup, no control characters, single line.
@@ -62,6 +78,20 @@ const line = (max: number, min = 0) =>
   z.string().trim().min(min).max(max).refine((v) => !/[<>\u0000-\u001f\u007f]/.test(v), "Use plain text (no < > or control characters)");
 const para = (max: number) => z.string().trim().max(max).refine((v) => !/[<>\u0000-\u0008\u000b-\u001f\u007f]/.test(v), "Use plain text (no < or >)");
 const hex = z.string().trim().regex(/^#[0-9a-fA-F]{6}$/, "Use a colour like #3b3fd8").transform((v) => v.toLowerCase());
+/** Empty, or an https URL on one of the network's own hosts. */
+const socialUrl = (hosts: readonly string[]) =>
+  z.string().trim().max(300).refine((v) => {
+    if (!v) return true;
+    try {
+      const u = new URL(v);
+      const h = u.hostname.toLowerCase();
+      return u.protocol === "https:" && !u.username && !u.password && hosts.some((x) => h === x || h.endsWith("." + x));
+    } catch {
+      return false;
+    }
+  }, `Use an https:// link on ${hosts[0]}`);
+const socialSchema = z.object(Object.fromEntries(SOCIAL_NETWORKS.map((n) => [n.id, socialUrl(n.hosts).default("")])) as Record<SocialId, z.ZodDefault<z.ZodString>>);
+
 const asset = z.string().regex(/^[a-f0-9]{32}\.(png|jpg|webp|svg)$/).nullable();
 
 export const brandingSchema = z.object({
@@ -86,6 +116,7 @@ export const brandingSchema = z.object({
   logoDark: asset,
   favicon: asset,
   ogImage: asset,
+  social: socialSchema.default(BRAND_DEFAULTS.social),
 });
 
 /** Parses stored JSON, keeping valid fields and falling back to defaults for anything invalid. */
@@ -99,6 +130,14 @@ export function sanitizeBranding(raw: unknown, base: Branding = BRAND_DEFAULTS):
   }
   return out;
 }
+
+/** Configured social links only, in display order. */
+export function socialLinks(b: Pick<Branding, "social">) {
+  return SOCIAL_NETWORKS.filter((n) => b.social?.[n.id]).map((n) => ({ id: n.id, label: n.label, url: b.social[n.id] }));
+}
+
+/** Field-level comparison that treats nested values (social links) by content. */
+export const sameValue = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
 
 export const assetUrl = (name: string | null) => (name ? `/brand/${name}` : null);
 export const footerLine = (b: Pick<Branding, "footerText" | "companyName">) =>

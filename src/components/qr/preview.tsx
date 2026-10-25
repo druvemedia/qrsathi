@@ -45,8 +45,6 @@ export function QrPreview({
   payload, design, invalid, invalidText = "Fix the highlighted fields to update", placeholderNote, className, showChecks = true,
 }: { payload: string; design: QrDesign; invalid?: boolean; invalidText?: string; placeholderNote?: string; className?: string; showChecks?: boolean }) {
   const { result, error } = useRendered(payload, design);
-  const scan = useScanTest(showChecks ? result?.svg : undefined, payload);
-  const warnings = useMemo(() => (showChecks ? designWarnings(design) : []), [design, showChecks]);
 
   return (
     <div className={className}>
@@ -75,43 +73,51 @@ export function QrPreview({
         <p className="mx-auto mt-3 max-w-[340px] rounded-xl bg-amber-50 px-3 py-2 text-center text-xs text-amber-800 dark:bg-amber-500/10 dark:text-amber-200">{placeholderNote}</p>
       )}
 
-      {showChecks && result && !invalid && (
-        <div className="mx-auto mt-4 max-w-[340px] space-y-2">
-          <div className={cn(
-            "flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-medium",
-            scan === "pass" && "bg-emerald-50 text-emerald-800 dark:bg-emerald-500/10 dark:text-emerald-200",
-            scan === "fail" && "bg-rose-50 text-rose-800 dark:bg-rose-500/10 dark:text-rose-200",
-            (scan === "testing" || scan === "idle") && "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300",
-          )} aria-live="polite">
-            {scan === "testing" && <><Loader2 className="h-4 w-4 animate-spin" /> Testing scan…</>}
-            {scan === "pass" && <><CheckCircle2 className="h-4 w-4" /> Scan test passed — decodes to your exact content</>}
-            {scan === "fail" && <><XCircle className="h-4 w-4" /> Our test scanner couldn&apos;t read this design. Increase contrast, shrink the logo, or use simpler modules.</>}
-            {scan === "idle" && <><ScanLine className="h-4 w-4" /> Scan test pending</>}
-          </div>
-          <p className="text-center text-[11px] text-slate-400">
-            v{result.version} · {result.moduleCount}×{result.moduleCount} modules · error correction {result.ecc} · {payload.length} chars
-          </p>
-          {warnings.map((w, i) => (
-            <div key={i} className={cn("flex gap-2 rounded-xl px-3 py-2 text-xs", w.level === "warn" ? "bg-amber-50 text-amber-900 dark:bg-amber-500/10 dark:text-amber-200" : "bg-sky-50 text-sky-900 dark:bg-sky-500/10 dark:text-sky-200")}>
-              {w.level === "warn" ? <AlertTriangle className="mt-px h-3.5 w-3.5 shrink-0" /> : <Info className="mt-px h-3.5 w-3.5 shrink-0" />}
-              {w.message}
-            </div>
-          ))}
+      {showChecks && result && !invalid && <PreviewChecks result={result} payload={payload} design={design} className="mx-auto mt-4 max-w-[340px]" />}
+    </div>
+  );
+}
+
+/** Live scan-test status, code metrics and design warnings for a rendered QR. */
+export function PreviewChecks({ result, payload, design, className }: { result: RenderResult; payload: string; design: QrDesign; className?: string }) {
+  const scan = useScanTest(result.svg, payload);
+  const warnings = useMemo(() => designWarnings(design), [design]);
+  return (
+    <div className={cn("space-y-2", className)}>
+      <div className={cn(
+        "flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-medium transition-colors duration-200",
+        scan === "pass" && "bg-emerald-50 text-emerald-800 dark:bg-emerald-500/10 dark:text-emerald-200",
+        scan === "fail" && "bg-rose-50 text-rose-800 dark:bg-rose-500/10 dark:text-rose-200",
+        (scan === "testing" || scan === "idle") && "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300",
+      )} aria-live="polite">
+        {scan === "testing" && <><Loader2 className="h-4 w-4 animate-spin" /> Testing scan…</>}
+        {scan === "pass" && <><CheckCircle2 className="h-4 w-4" /> Our test scanner read it: decodes to your exact content</>}
+        {scan === "fail" && <><XCircle className="h-4 w-4" /> Our test scanner couldn&apos;t read this design. Increase contrast, shrink the logo, or use simpler modules.</>}
+        {scan === "idle" && <><ScanLine className="h-4 w-4" /> Scan test pending</>}
+      </div>
+      <p className="text-center text-[11px] text-slate-400">
+        v{result.version} · {result.moduleCount}×{result.moduleCount} modules · error correction {result.ecc} · {payload.length} chars
+      </p>
+      {warnings.map((w, i) => (
+        <div key={i} className={cn("flex gap-2 rounded-xl px-3 py-2 text-xs", w.level === "warn" ? "bg-amber-50 text-amber-900 dark:bg-amber-500/10 dark:text-amber-200" : "bg-sky-50 text-sky-900 dark:bg-sky-500/10 dark:text-sky-200")}>
+          {w.level === "warn" ? <AlertTriangle className="mt-px h-3.5 w-3.5 shrink-0" /> : <Info className="mt-px h-3.5 w-3.5 shrink-0" />}
+          {w.message}
         </div>
-      )}
+      ))}
     </div>
   );
 }
 
 /** Small static thumbnail for lists. */
-export function QrThumb({ payload, design, className }: { payload: string; design: Partial<QrDesign>; className?: string }) {
+/** `idKey` keeps SVG ids unique when the same code is drawn twice on a page. */
+export function QrThumb({ payload, design, className, idKey = "" }: { payload: string; design: Partial<QrDesign>; className?: string; idKey?: string }) {
   const svg = useMemo(() => {
     try {
-      return renderQr(payload, design, { idPrefix: "th" + Math.abs(hash(payload)).toString(36) }).svg;
+      return renderQr(payload, design, { idPrefix: "th" + idKey + Math.abs(hash(payload)).toString(36) }).svg;
     } catch {
       return "";
     }
-  }, [payload, design]);
+  }, [payload, design, idKey]);
   return <div className={cn("[&>svg]:h-full [&>svg]:w-full", className)} dangerouslySetInnerHTML={{ __html: svg }} aria-hidden />;
 }
 

@@ -1,7 +1,9 @@
 "use client";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import { mergeDesign, renderQr } from "@/lib/qr-render";
+import { TEMPLATES } from "@/lib/templates";
 import { BarChart3, Eye, EyeOff, IndianRupee, RefreshCw, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "@/lib/fetcher";
@@ -12,13 +14,30 @@ import { useApp } from "@/components/providers";
 import { ThemeToggle } from "@/components/user-menu";
 import { Alert, Button, Field, Input } from "@/components/ui";
 
+/** Decorative fan of real rendered styles (they encode example.com). */
+function StyleFan() {
+  const svgs = useMemo(() => ["aurora", "classic", "ocean"].map((id) =>
+    renderQr("https://example.com", mergeDesign({ ...TEMPLATES.find((t) => t.id === id)!.design, margin: 1, frame: "none" }), { idPrefix: `auth-${id}` }).svg), []);
+  return (
+    <div className="relative mx-auto h-48 w-72" aria-hidden>
+      {svgs.map((svg, i) => (
+        <div key={i} className="absolute left-1/2 top-1/2 h-36 w-36 rounded-3xl bg-white p-3 shadow-2xl [&>svg]:h-full [&>svg]:w-full"
+          style={{ transform: `translate(-50%,-50%) translateX(${(i - 1) * 70}px) rotate(${(i - 1) * 10}deg)`, zIndex: i === 1 ? 2 : 1 }}
+          dangerouslySetInnerHTML={{ __html: svg }} />
+      ))}
+    </div>
+  );
+}
+
 export function AuthAside() {
   const { settings } = useApp();
   const b = settings.branding;
   return (
-    <aside className="relative hidden flex-col justify-between border-r border-zinc-800 bg-[#0b0b0d] p-12 text-zinc-100 lg:flex">
-      <div className="[&_a]:text-white"><Logo /></div>
-      <div className="max-w-md">
+    <aside className="relative hidden flex-col justify-between overflow-hidden border-r border-zinc-800 bg-[#0b0b0d] p-12 text-zinc-100 lg:flex">
+      <div className="pointer-events-none absolute inset-0" aria-hidden style={{ background: "radial-gradient(60% 45% at 50% 35%, hsl(var(--brand) / .35), transparent 70%)" }} />
+      <div className="relative [&_a]:text-white"><Logo /></div>
+      <div className="relative"><StyleFan /></div>
+      <div className="relative max-w-md">
         <p className="font-serif text-4xl leading-[1.15] tracking-tight">Codes for the counter, the shelf and the campaign.</p>
         <ul className="mt-10 space-y-4 text-sm text-zinc-300">
           {[
@@ -31,7 +50,7 @@ export function AuthAside() {
           ))}
         </ul>
       </div>
-      <p className="text-xs text-zinc-500">{footerLine(b)}</p>
+      <p className="relative text-xs text-zinc-500">{footerLine(b)}</p>
     </aside>
   );
 }

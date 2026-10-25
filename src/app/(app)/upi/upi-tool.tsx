@@ -143,7 +143,7 @@ export function UpiTool() {
         </Card>
 
         <Card className="p-5">
-          <h2 className="font-display text-lg font-bold">How it works</h2>
+          <h2 className="font-serif text-lg font-medium">How it works</h2>
           <div className="mt-4 grid gap-4 sm:grid-cols-2">
             <div>
               <p className="text-sm font-semibold">For your customers</p>
@@ -173,7 +173,7 @@ export function UpiTool() {
 
       <div className="space-y-4 self-start lg:sticky lg:top-24">
         <Card className="p-5">
-          <h2 className="mb-4 font-display text-base font-bold">Test preview</h2>
+          <h2 className="mb-4 font-serif text-lg font-medium">Test preview</h2>
           <QrPreview payload={payload || "upi://pay?pa=example@upi&cu=INR"} design={design} invalid={!ok}
             invalidText={!data.vpa && !data.name ? "Enter your UPI ID and name to generate" : undefined} />
           {parsed && (
@@ -198,7 +198,7 @@ export function UpiTool() {
           <p className="mt-2 flex items-start gap-1.5 text-[11px] text-slate-500"><Info className="mt-px h-3 w-3 shrink-0" /> “Open in app” launches your installed UPI app on a phone so you can check the details. You still review and approve any payment yourself.</p>
         </Card>
         <Card className="p-5">
-          <h2 className="mb-4 font-display text-base font-bold">Download</h2>
+          <h2 className="mb-4 font-serif text-lg font-medium">Download</h2>
           <ExportPanel payload={payload} design={design} name={`upi-${data.name || "payment"}`} disabledReason={ok ? undefined : "Enter a valid UPI ID and payee name to download."}
             posterDefaults={standee(data.name, display, data.vpa, amountLabel, data.note)} />
           <Button variant="secondary" className="mt-2 w-full lg:hidden" onClick={() => setPoster(true)} disabled={!ok}><Printer className="h-4 w-4" /> Printable standee</Button>

@@ -24,7 +24,7 @@ Guard legend: *user* = `requireUser()`; *admin* / *super admin* = `requireAdmin(
 | 1 | `/api/account` | GET, PATCH, DELETE | user, rate-limited | GET own profile; PATCH name/password (current password required; other sessions revoked); DELETE account (type e-mail to confirm) | `src/app/api/account/route.ts` |
 | 2 | `/api/account/sessions` | POST | user | POST sign out all other devices | `src/app/api/account/sessions/route.ts` |
 | 3 | `/api/admin/analytics` | GET | admin | Platform analytics (admin) | `src/app/api/admin/analytics/route.ts` |
-| 4 | `/api/admin/auth/login` | POST | public | Admin sign-in step 1 (password); returns MFA ticket when MFA enabled | `src/app/api/admin/auth/login/route.ts` |
+| 4 | `/api/admin/auth/login` | POST | rate-limited | Admin sign-in step 1 (password); returns MFA ticket when MFA enabled | `src/app/api/admin/auth/login/route.ts` |
 | 5 | `/api/admin/auth/logout` | POST | admin session (checked in handler) | End admin-console session | `src/app/api/admin/auth/logout/route.ts` |
 | 6 | `/api/admin/auth/me` | GET | admin session (checked in handler) | Current administrator | `src/app/api/admin/auth/me/route.ts` |
 | 7 | `/api/admin/auth/mfa` | POST | rate-limited | Admin sign-in step 2 (TOTP or recovery code) | `src/app/api/admin/auth/mfa/route.ts` |
@@ -58,7 +58,7 @@ Guard legend: *user* = `requireUser()`; *admin* / *super admin* = `requireAdmin(
 | 35 | `/api/auth/forgot` | POST | rate-limited | Request password-reset e-mail (same response for any e-mail) | `src/app/api/auth/forgot/route.ts` |
 | 36 | `/api/auth/google` | GET | public | Start Google OAuth flow | `src/app/api/auth/google/route.ts` |
 | 37 | `/api/auth/google/callback` | GET | public | Google OAuth callback (state check, verified e-mail) | `src/app/api/auth/google/callback/route.ts` |
-| 38 | `/api/auth/login` | POST | public | Workspace sign-in | `src/app/api/auth/login/route.ts` |
+| 38 | `/api/auth/login` | POST | rate-limited | Workspace sign-in | `src/app/api/auth/login/route.ts` |
 | 39 | `/api/auth/logout` | POST | public | Workspace sign-out | `src/app/api/auth/logout/route.ts` |
 | 40 | `/api/auth/me` | GET | optional user | Current user (or null) | `src/app/api/auth/me/route.ts` |
 | 41 | `/api/auth/reset` | POST | rate-limited | Set new password with a reset token | `src/app/api/auth/reset/route.ts` |

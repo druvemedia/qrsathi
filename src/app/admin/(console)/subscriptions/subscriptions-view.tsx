@@ -1,8 +1,9 @@
 "use client";
+import { CalendarX, XCircle } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
-import { Alert, Badge, Button, ConfirmDialog, FilterBar, SearchInput, Section, Select, StatCard } from "@/components/ui";
-import { DataTable, Pagination, fmtDate, fmtNum, useAdminApi, useAdminData, useListQuery, type Column, type Paged } from "@/components/admin/data";
+import { Alert, Badge, ConfirmDialog, SearchInput, Select } from "@/components/ui";
+import { DataTable, Pagination, fmtDate, fmtNum, useAdminApi, useAdminData, useListQuery, type Column, type Paged, TableView, MetricStrip, StripStat, RowMenu } from "@/components/admin/data";
 import { formatMoney } from "@/lib/plans";
 
 interface Row {
@@ -43,10 +44,10 @@ export function SubscriptionsView({ canManage }: { canManage: boolean }) {
     { key: "period", label: "Period ends", hideSm: true, render: (r) => <span className="text-xs">{fmtDate(r.currentPeriodEnd)}</span> },
     {
       key: "actions", label: <span className="sr-only">Actions</span>, className: "text-right", render: (r) => canManage && ["active", "authenticated", "pending"].includes(r.status) ? (
-        <div className="flex justify-end gap-1">
-          {!r.cancelAtPeriodEnd && <Button size="sm" variant="outline" onClick={() => setCancel({ row: r, atPeriodEnd: true })}>Cancel at period end</Button>}
-          <Button size="sm" variant="ghost" onClick={() => setCancel({ row: r, atPeriodEnd: false })}>Cancel now</Button>
-        </div>
+        <RowMenu label={`Subscription actions for ${r.email}`} items={[
+          { label: "Cancel at period end", icon: CalendarX, hidden: r.cancelAtPeriodEnd, onClick: () => setCancel({ row: r, atPeriodEnd: true }) },
+          { label: "Cancel now", icon: XCircle, danger: true, onClick: () => setCancel({ row: r, atPeriodEnd: false }) },
+        ]} />
       ) : null,
     },
   ];
@@ -55,35 +56,32 @@ export function SubscriptionsView({ canManage }: { canManage: boolean }) {
     <div className="space-y-6">
       {data && !data.billingConfigured && <Alert tone="info" title="Online checkout is off">Customers can&apos;t start subscriptions until Razorpay is configured and enabled under Payment gateway. Paid plans on accounts without a subscription were assigned by an administrator.</Alert>}
       {data && (
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-          <StatCard label="Active subscriptions" value={fmtNum(data.byStatus.find((s) => s.status === "active")?.count)} />
-          <StatCard label="Payment problems" value={fmtNum((data.byStatus.find((s) => s.status === "pending")?.count ?? 0) + (data.byStatus.find((s) => s.status === "halted")?.count ?? 0))} hint="Pending or halted" tone={(data.byStatus.find((s) => s.status === "halted")?.count ?? 0) ? "warn" : undefined} />
-          <StatCard label="Renewing in 7 days" value={fmtNum(data.renewingSoon)} />
-          <StatCard label="Admin-assigned paid plans" value={fmtNum(data.adminAssigned)} hint="No active subscription" />
-        </div>
+        <MetricStrip>
+          <StripStat label="Active subscriptions" value={fmtNum(data.byStatus.find((s) => s.status === "active")?.count)} />
+          <StripStat label="Payment problems" value={fmtNum((data.byStatus.find((s) => s.status === "pending")?.count ?? 0) + (data.byStatus.find((s) => s.status === "halted")?.count ?? 0))} hint="Pending or halted" tone={(data.byStatus.find((s) => s.status === "halted")?.count ?? 0) ? "warn" : undefined} />
+          <StripStat label="Renewing in 7 days" value={fmtNum(data.renewingSoon)} />
+          <StripStat label="Admin-assigned paid plans" value={fmtNum(data.adminAssigned)} hint="No active subscription" />
+        </MetricStrip>
       )}
       {data && (
-        <Section title="Accounts per plan">
-          <ul className="grid gap-2 text-sm sm:grid-cols-2 lg:grid-cols-4">
-            {data.plans.map((p) => <li key={p.id} className="flex items-center justify-between rounded-lg border border-slate-100 px-3 py-2 dark:border-slate-800"><span>{p.name} {p.status !== "published" && <Badge>{p.status}</Badge>}</span><span className="tabular-nums">{fmtNum(p.users)}</span></li>)}
-          </ul>
-        </Section>
+        <div className="flex flex-wrap items-center gap-2">
+          <h2 className="mr-2 text-sm font-medium text-slate-500">Accounts per plan</h2>
+          {data.plans.map((p) => <span key={p.id} className="inline-flex items-center gap-2 rounded-full border border-slate-200/80 bg-white px-3 py-1 text-sm dark:border-slate-800 dark:bg-slate-900">{p.name} {p.status !== "published" && <Badge>{p.status}</Badge>}<span className="font-semibold tabular-nums">{fmtNum(p.users)}</span></span>)}
+        </div>
       )}
-      <Section title="Subscriptions" description={data ? `${fmtNum(data.total)} matching` : undefined}>
-        <FilterBar>
-          <SearchInput value={list.state.q} onChange={list.setQ} placeholder="Customer e-mail or sub_ id" aria-label="Search subscriptions" className="w-full sm:w-64" />
-          <Select aria-label="Filter by status" value={list.state.filters.status || ""} onChange={(e) => list.setFilter("status", e.target.value)} className="w-auto">
+      <TableView title="Subscriptions" count={data ? `${fmtNum(data.total)} matching` : undefined}
+          toolbar={<>
+          <SearchInput value={list.state.q} onChange={list.setQ} placeholder="Customer e-mail or sub_ id" aria-label="Search subscriptions" className="sm:w-64" />
+          <Select aria-label="Filter by status" value={list.state.filters.status || ""} onChange={(e) => list.setFilter("status", e.target.value)} className="sm:w-auto">
             <option value="">All statuses</option><option value="live">Active / pending</option><option value="active">Active</option><option value="pending">Pending</option><option value="halted">Halted</option><option value="cancelled">Cancelled</option><option value="created">Checkout started</option>
           </Select>
-          <Select aria-label="Filter by plan" value={list.state.filters.plan || ""} onChange={(e) => list.setFilter("plan", e.target.value)} className="w-auto">
+          <Select aria-label="Filter by plan" value={list.state.filters.plan || ""} onChange={(e) => list.setFilter("plan", e.target.value)} className="sm:w-auto">
             <option value="">All plans</option>{data?.plans.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
           </Select>
-        </FilterBar>
-        <div className="mt-4">
+          </>}
+          footer={data && data.total > 0 && <Pagination page={data.page} pages={data.pages} total={data.total} pageSize={data.pageSize} onPage={list.setPage} onPageSize={list.setPageSize} />}>
           <DataTable caption="Subscriptions" columns={columns} data={data?.items} loading={loading} error={error} onRetry={reload} empty={{ title: "No subscriptions yet" }} />
-          {data && <Pagination page={data.page} pages={data.pages} total={data.total} pageSize={data.pageSize} onPage={list.setPage} onPageSize={list.setPageSize} />}
-        </div>
-      </Section>
+      </TableView>
       <ConfirmDialog open={!!cancel} onClose={() => setCancel(null)} title={cancel?.atPeriodEnd ? "Cancel at the end of the period?" : "Cancel immediately?"} confirmLabel="Cancel subscription" onConfirm={doCancel}>
         {cancel?.atPeriodEnd ? `${cancel.row.email} keeps ${cancel.row.planName} until the current period ends; Razorpay won't charge again.` : `${cancel?.row.email} loses paid access now and Razorpay stops charging. No automatic refund is made.`}
       </ConfirmDialog>

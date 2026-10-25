@@ -53,6 +53,8 @@ export interface QrTypeDef {
   forceDynamic?: boolean;
   /** Returns true when this data must be served as a hosted landing page. */
   hosted?: (data: any) => boolean;
+  /** Official brand mark shown in pickers (see brand-icons.ts). */
+  brand?: string;
   /** Suggested built-in centre logo and frame caption. */
   logo?: string;
   caption?: string;
@@ -109,6 +111,22 @@ function handleOrUrl(input: string, base: string, prefix = "") {
   if (/^https?:\/\//i.test(v) || /\.(com|in|me|be)\//i.test(v)) return normalizeUrl(v);
   return `${base}${prefix}${v.replace(/^@/, "")}`;
 }
+
+/** True when `v` is an http(s) URL on one of `hosts` (or a subdomain). */
+function onHost(v: string, hosts: string[]) {
+  try {
+    const u = new URL(normalizeUrl(v));
+    const h = u.hostname.toLowerCase();
+    return (u.protocol === "https:" || u.protocol === "http:") && hosts.some((x) => h === x || h.endsWith("." + x));
+  } catch {
+    return false;
+  }
+}
+/** A bare @handle or a profile link on the brand's own domain. */
+const handleOrLink = (label: string, handle: RegExp, hosts: string[], hint: string) =>
+  req(label, 300).refine((v) => (/[/.:]/.test(v.replace(/^@/, "")) && !handle.test(v) ? onHost(v, hosts) : handle.test(v)), hint);
+const profile = (v: string, base: string, hosts: string[]) =>
+  onHost(v, hosts) && /[/:]/.test(v) ? normalizeUrl(v) : base + v.trim().replace(/^@/, "");
 
 const vEsc = (v: string) => v.replace(/\\/g, "\\\\").replace(/\n/g, "\\n").replace(/,/g, "\\,").replace(/;/g, "\\;");
 const wifiEsc = (v: string) => v.replace(/([\\;,:"])/g, "\\$1");
@@ -305,6 +323,7 @@ export const QR_TYPES: QrTypeDef[] = [
     description: "Start a WhatsApp chat",
     category: "social",
     icon: "MessageCircle",
+    brand: "whatsapp",
     fields: [
       { name: "phone", label: "WhatsApp number (with country code)", kind: "tel", placeholder: "+91 98765 43210", required: true },
       { name: "message", label: "Pre-filled message", kind: "textarea", placeholder: "Hi! I found you via your QR code." },
@@ -325,6 +344,7 @@ export const QR_TYPES: QrTypeDef[] = [
     description: "Open an Instagram profile",
     category: "social",
     icon: "Camera",
+    brand: "instagram",
     fields: [{ name: "username", label: "Username or profile URL", kind: "text", placeholder: "@yourbrand", required: true }],
     defaults: { username: "" },
     schema: z.object({
@@ -341,6 +361,7 @@ export const QR_TYPES: QrTypeDef[] = [
     description: "Profile or page",
     category: "social",
     icon: "ThumbsUp",
+    brand: "facebook",
     fields: [{ name: "page", label: "Page username or URL", kind: "text", placeholder: "yourbrand or https://facebook.com/yourbrand", required: true }],
     defaults: { page: "" },
     schema: z.object({
@@ -357,6 +378,7 @@ export const QR_TYPES: QrTypeDef[] = [
     description: "Channel or video",
     category: "social",
     icon: "CirclePlay",
+    brand: "youtube",
     fields: [{ name: "target", label: "Channel handle or video/channel URL", kind: "text", placeholder: "@yourchannel or https://youtu.be/…", required: true }],
     defaults: { target: "" },
     schema: z.object({
@@ -373,6 +395,7 @@ export const QR_TYPES: QrTypeDef[] = [
     description: "Profile or company page",
     category: "social",
     icon: "Briefcase",
+    brand: "linkedin",
     fields: [
       { name: "kind", label: "Type", kind: "select", options: [{ value: "in", label: "Personal profile" }, { value: "company", label: "Company page" }], half: true },
       { name: "handle", label: "Profile ID or URL", kind: "text", placeholder: "your-name", required: true },
@@ -388,11 +411,97 @@ export const QR_TYPES: QrTypeDef[] = [
     caption: "CONNECT",
   },
   {
+    id: "tiktok",
+    label: "TikTok",
+    description: "Open a TikTok profile",
+    category: "social",
+    icon: "Music2",
+    brand: "tiktok",
+    fields: [{ name: "username", label: "Username or profile URL", kind: "text", placeholder: "@yourbrand", required: true }],
+    defaults: { username: "" },
+    schema: z.object({
+      username: handleOrLink("Username", /^@?[\w.]{2,24}$/, ["tiktok.com"], "Enter a TikTok username or a tiktok.com link"),
+    }),
+    build: (d) => profile(d.username, "https://www.tiktok.com/@", ["tiktok.com"]),
+    dynamicCapable: true,
+    logo: "tiktok",
+    caption: "FOLLOW US",
+  },
+  {
+    id: "x",
+    label: "X (Twitter)",
+    description: "Open an X profile",
+    category: "social",
+    icon: "AtSign",
+    brand: "x",
+    fields: [{ name: "handle", label: "Handle or profile URL", kind: "text", placeholder: "@yourbrand", required: true }],
+    defaults: { handle: "" },
+    schema: z.object({
+      handle: handleOrLink("Handle", /^@?\w{1,15}$/, ["x.com", "twitter.com"], "Enter an X handle (up to 15 letters, digits or _) or an x.com link"),
+    }),
+    build: (d) => profile(d.handle, "https://x.com/", ["x.com", "twitter.com"]),
+    dynamicCapable: true,
+    logo: "x",
+    caption: "FOLLOW US",
+  },
+  {
+    id: "telegram",
+    label: "Telegram",
+    description: "Open a chat, group or channel",
+    category: "social",
+    icon: "Send",
+    brand: "telegram",
+    fields: [{ name: "username", label: "Username or t.me link", kind: "text", placeholder: "@yourchannel", required: true }],
+    defaults: { username: "" },
+    schema: z.object({
+      username: handleOrLink("Username", /^@?[a-zA-Z]\w{3,31}$/, ["t.me", "telegram.me"], "Enter a Telegram username (5–32 characters) or a t.me link"),
+    }),
+    build: (d) => profile(d.username, "https://t.me/", ["t.me", "telegram.me"]),
+    dynamicCapable: true,
+    logo: "telegram",
+    caption: "JOIN US",
+  },
+  {
+    id: "snapchat",
+    label: "Snapchat",
+    description: "Add a Snapchat friend",
+    category: "social",
+    icon: "Ghost",
+    brand: "snapchat",
+    fields: [{ name: "username", label: "Username or profile URL", kind: "text", placeholder: "yourbrand", required: true }],
+    defaults: { username: "" },
+    schema: z.object({
+      username: handleOrLink("Username", /^@?[a-zA-Z][\w.-]{2,14}$/, ["snapchat.com"], "Enter a Snapchat username (3–15 characters) or a snapchat.com link"),
+    }),
+    build: (d) => profile(d.username, "https://www.snapchat.com/add/", ["snapchat.com"]),
+    dynamicCapable: true,
+    logo: "snapchat",
+    caption: "ADD ME",
+  },
+  {
+    id: "spotify",
+    label: "Spotify",
+    description: "Artist, album, playlist or podcast",
+    category: "social",
+    icon: "Music",
+    brand: "spotify",
+    fields: [{ name: "url", label: "Spotify link", kind: "url", placeholder: "https://open.spotify.com/playlist/…", hint: "In Spotify: Share → Copy link", required: true }],
+    defaults: { url: "" },
+    schema: z.object({
+      url: url("Spotify link").refine((v) => onHost(v, ["open.spotify.com", "spotify.link"]), "Use an open.spotify.com or spotify.link address"),
+    }),
+    build: (d) => d.url,
+    dynamicCapable: true,
+    logo: "spotify",
+    caption: "LISTEN NOW",
+  },
+  {
     id: "maps",
     label: "Google Maps",
     description: "Navigate to a location",
     category: "business",
     icon: "MapPin",
+    brand: "maps",
     fields: [
       { name: "mode", label: "Location by", kind: "select", options: [{ value: "address", label: "Address / place name" }, { value: "coords", label: "Coordinates" }] },
       { name: "query", label: "Address or place", kind: "text", placeholder: "Gateway of India, Mumbai", showIf: { field: "mode", equals: "address" } },

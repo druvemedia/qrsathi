@@ -1,7 +1,7 @@
 "use client";
 import { KeyRound, MonitorSmartphone, ShieldAlert, ShieldX } from "lucide-react";
-import { Badge, FilterBar, SearchInput, Section, Segmented, StatCard } from "@/components/ui";
-import { DataTable, Pagination, fmtDateTime, fmtNum, useAdminData, useListQuery, type Column, type Paged } from "@/components/admin/data";
+import { Badge, SearchInput, Segmented } from "@/components/ui";
+import { DataTable, Pagination, fmtDateTime, fmtNum, useAdminData, useListQuery, type Column, type Paged, TableView, MetricStrip, StripStat } from "@/components/admin/data";
 import { ROLE_LABELS } from "@/lib/roles";
 
 interface Row { id: string; actorId: string | null; actorEmail: string; action: string; targetType: string; targetId: string; details: string; ip: string; createdAt: string }
@@ -35,20 +35,20 @@ export function SecurityView({ initialCategory, mode = "audit" }: { initialCateg
   return (
     <div className="space-y-6">
       {s && mode !== "audit" && (
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-          <StatCard label="Failed sign-ins (24 h)" value={fmtNum(s.failed24h)} icon={<ShieldX />} tone={s.failed24h > 20 ? "warn" : undefined} />
-          <StatCard label="Failed 2FA codes (24 h)" value={fmtNum(s.mfaFailed24h)} icon={<ShieldAlert />} tone={s.mfaFailed24h > 5 ? "warn" : undefined} />
-          <StatCard label="Active admin sessions" value={fmtNum(s.activeAdminSessions)} icon={<MonitorSmartphone />} />
-          <StatCard label="Admins without 2FA" value={fmtNum(noMfa)} icon={<KeyRound />} tone={noMfa ? "warn" : undefined} />
-        </div>
+        <MetricStrip>
+          <StripStat label="Failed sign-ins (24 h)" value={fmtNum(s.failed24h)} icon={<ShieldX />} tone={s.failed24h > 20 ? "warn" : undefined} />
+          <StripStat label="Failed 2FA codes (24 h)" value={fmtNum(s.mfaFailed24h)} icon={<ShieldAlert />} tone={s.mfaFailed24h > 5 ? "warn" : undefined} />
+          <StripStat label="Active admin sessions" value={fmtNum(s.activeAdminSessions)} icon={<MonitorSmartphone />} />
+          <StripStat label="Admins without 2FA" value={fmtNum(noMfa)} icon={<KeyRound />} tone={noMfa ? "warn" : undefined} />
+        </MetricStrip>
       )}
 
       {s && mode === "admins" && (
-        <Section title="Administrator accounts" description="Roles are granted only by a super administrator or the server-side admin CLI.">
-          <ul className="divide-y divide-slate-100 text-sm dark:divide-slate-800">
+        <TableView title="Administrator accounts" count="Roles are granted only by a super administrator or the server-side admin CLI.">
+          <ul className="divide-y divide-slate-100 text-sm dark:divide-slate-800" aria-label="Administrators">
             {s.admins.map((a) => (
-              <li key={a.id} className="flex flex-wrap items-center justify-between gap-2 py-2">
-                <span className="min-w-0 truncate">{a.email}</span>
+              <li key={a.id} className="flex flex-wrap items-center justify-between gap-3 px-5 py-3">
+                <span className="flex min-w-0 items-center gap-3"><span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-amber-100 text-[11px] font-semibold text-amber-800 dark:bg-amber-500/15 dark:text-amber-300" aria-hidden>{a.email.slice(0, 2).toUpperCase()}</span><span className="min-w-0 truncate font-medium">{a.email}</span></span>
                 <span className="flex flex-wrap items-center gap-1.5">
                   <Badge tone="amber">{ROLE_LABELS[a.role]}</Badge>
                   {a.mfaEnabled ? <Badge tone="green">2FA on</Badge> : <Badge tone="rose">2FA off</Badge>}
@@ -58,20 +58,18 @@ export function SecurityView({ initialCategory, mode = "audit" }: { initialCateg
               </li>
             ))}
           </ul>
-        </Section>
+        </TableView>
       )}
 
-      {mode !== "admins" && <Section title={mode === "events" ? "Security events" : "Audit log"} description={data ? `${fmtNum(data.total)} events` : undefined}>
-        <FilterBar>
+      {mode !== "admins" && <TableView title={mode === "events" ? "Security events" : "Audit log"} count={data ? `${fmtNum(data.total)} events` : undefined}
+          toolbar={<>
           <Segmented size="sm" value={list.state.filters.category || ""} onChange={(v) => list.setFilter("category", v)}
             options={[{ value: "", label: "All" }, { value: "admin", label: "Admin actions" }, { value: "auth", label: "Sign-in" }, { value: "failures", label: "Failures" }]} />
-          <SearchInput value={list.state.q} onChange={list.setQ} placeholder="Event, actor or target" aria-label="Search audit log" className="w-full sm:w-64" />
-        </FilterBar>
-        <div className="mt-4">
+          <SearchInput value={list.state.q} onChange={list.setQ} placeholder="Event, actor or target" aria-label="Search audit log" className="sm:w-64" />
+          </>}
+          footer={data && data.total > 0 && <Pagination page={data.page} pages={data.pages} total={data.total} pageSize={data.pageSize} onPage={list.setPage} onPageSize={list.setPageSize} />}>
           <DataTable caption="Audit log" columns={columns} data={data?.items} loading={loading} error={error} onRetry={reload} empty={{ title: "No events match" }} />
-          {data && <Pagination page={data.page} pages={data.pages} total={data.total} pageSize={data.pageSize} onPage={list.setPage} onPageSize={list.setPageSize} />}
-        </div>
-      </Section>}
+      </TableView>}
     </div>
   );
 }

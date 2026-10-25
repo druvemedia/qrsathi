@@ -65,6 +65,8 @@ const samples: Record<string, any> = {
   phone: { phone: "+91 98765 43210" }, sms: { phone: "+919876543210", message: "Hi" }, email: { to: "a@b.in", subject: "Hello there", body: "Line" },
   wifi: { ssid: "Cafe;WiFi", password: "pass:word1", security: "WPA", hidden: false },
   whatsapp: { phone: "+91 98765 43210", message: "Hi there" }, instagram: { username: "@brand" }, facebook: { page: "brand" },
+  tiktok: { username: "@brand.in" }, x: { handle: "brand_in" }, telegram: { username: "@brandchannel" }, snapchat: { username: "brand-in" },
+  spotify: { url: "https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M" },
   youtube: { target: "@channel" }, linkedin: { kind: "in", handle: "asha-rao" }, maps: { mode: "coords", query: "", lat: "18.92", lng: "72.83" },
   upi: { vpa: "shop@okaxis", name: "Shop", amount: "", note: "", mc: "", tr: "" },
   bank: { format: "upi", name: "Asha Rao", account: "123456789012", ifsc: "sbin0001234", bankName: "", amount: "100", note: "" },
@@ -87,6 +89,31 @@ for (const t of QR_TYPES) {
   const ok = got === payload;
   if (!ok) fail++;
   console.log(`${ok ? "PASS" : "FAIL"}  type ${t.id.padEnd(10)} ${JSON.stringify(payload).slice(0, 90)}`);
+}
+
+// social profile types: exact payloads, and links to other sites are refused
+const social: [string, Record<string, string>, string | null][] = [
+  ["tiktok", { username: "@brand.in" }, "https://www.tiktok.com/@brand.in"],
+  ["tiktok", { username: "https://www.tiktok.com/@brand.in" }, "https://www.tiktok.com/@brand.in"],
+  ["tiktok", { username: "evil.com/tiktok.com/@x" }, null],
+  ["x", { handle: "@brand_in" }, "https://x.com/brand_in"],
+  ["x", { handle: "twitter.com/brand_in" }, "https://twitter.com/brand_in"],
+  ["x", { handle: "this_handle_is_too_long" }, null],
+  ["telegram", { username: "brandchannel" }, "https://t.me/brandchannel"],
+  ["telegram", { username: "t.me/brandchannel" }, "https://t.me/brandchannel"],
+  ["telegram", { username: "abc" }, null],
+  ["snapchat", { username: "brand-in" }, "https://www.snapchat.com/add/brand-in"],
+  ["snapchat", { username: "https://snapchat.com.evil.io/add/x" }, null],
+  ["spotify", { url: "open.spotify.com/artist/abc" }, "https://open.spotify.com/artist/abc"],
+  ["spotify", { url: "https://example.com/spotify" }, null],
+];
+for (const [id, data, want] of social) {
+  const t = QR_TYPES.find((x) => x.id === id)!;
+  const v = validateContent(t, data);
+  const got = v.ok ? buildPayload(t, v.data!, { hostedUrl: "" }) : null;
+  const ok = got === want;
+  if (!ok) fail++;
+  console.log(`${ok ? "PASS" : "FAIL"}  ${id} ${JSON.stringify(Object.values(data)[0])} -> ${got ?? "rejected"}`);
 }
 
 // UPI round trip + validation negatives

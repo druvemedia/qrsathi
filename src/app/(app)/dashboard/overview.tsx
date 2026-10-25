@@ -2,14 +2,15 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import {
-  AlertTriangle, ArrowRight, Barcode, Boxes, FileSpreadsheet, FileUp, IndianRupee, Package, PackagePlus, Palette, QrCode, ScanLine, Warehouse,
+  AlertTriangle, ArrowRight, ArrowUpRight, Barcode, FileSpreadsheet, FileUp, IndianRupee, Package, PackagePlus, Palette, Plus, QrCode, ScanLine, Warehouse,
 } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "@/lib/fetcher";
 import { getType } from "@/lib/qr-types";
-import { formatDate, formatNumber } from "@/lib/utils";
-import { Badge, Card, EmptyState, LinkButton, LoadingSkeleton, Skeleton, StatCard } from "@/components/ui";
+import { cn, formatDate, formatNumber } from "@/lib/utils";
+import { Badge, EmptyState, LinkButton, LoadingSkeleton, Skeleton } from "@/components/ui";
 import { QrThumb } from "@/components/qr/preview";
+import { TypeGlyph } from "@/components/brand-icon";
 import { useApp } from "@/components/providers";
 
 interface Overview {
@@ -19,151 +20,203 @@ interface Overview {
   activity: { id: string; type: string; quantity: number; balance: number; createdAt: string; note: string; product: { id: string; name: string } }[];
 }
 
-const TX: Record<string, [string, "green" | "rose" | "blue" | "slate" | "amber" | "violet"]> = {
-  created: ["Created", "violet"], imported: ["Imported", "violet"], in: ["Stock in", "green"], out: ["Stock out", "rose"],
-  adjust: ["Adjusted", "blue"], updated: ["Edited", "slate"], archived: ["Archived", "amber"], restored: ["Restored", "green"],
+const TX: Record<string, [string, string]> = {
+  created: ["Created", "bg-violet-500"], imported: ["Imported", "bg-violet-500"], in: ["Stock in", "bg-emerald-500"], out: ["Stock out", "bg-rose-500"],
+  adjust: ["Adjusted", "bg-sky-500"], updated: ["Edited", "bg-zinc-400"], archived: ["Archived", "bg-amber-500"], restored: ["Restored", "bg-emerald-500"],
 };
+
+const QUICK = ["url", "upi", "whatsapp", "wifi", "instagram", "vcard", "menu", "maps"];
 
 function greeting() {
   const h = new Date().getHours();
   return h < 12 ? "Good morning" : h < 17 ? "Good afternoon" : "Good evening";
 }
 
-function Panel({ title, href, linkLabel = "View all", children }: { title: string; href?: string; linkLabel?: string; children: React.ReactNode }) {
+function Heading({ children, href, linkLabel = "View all" }: { children: React.ReactNode; href?: string; linkLabel?: string }) {
   return (
-    <Card>
-      <div className="flex items-center justify-between border-b border-slate-100 px-5 py-3.5 dark:border-slate-800">
-        <h2 className="section-title">{title}</h2>
-        {href && <Link href={href} className="inline-flex items-center gap-1 text-xs font-medium text-slate-500 hover:text-slate-900 dark:hover:text-white">{linkLabel} <ArrowRight className="h-3 w-3" /></Link>}
-      </div>
-      <div className="p-2">{children}</div>
-    </Card>
+    <div className="mb-3 flex items-center justify-between">
+      <h2 className="font-serif text-lg font-medium">{children}</h2>
+      {href && <Link href={href} className="inline-flex items-center gap-1 text-xs font-medium text-slate-500 hover:text-slate-900 dark:hover:text-white">{linkLabel} <ArrowRight className="h-3 w-3" aria-hidden /></Link>}
+    </div>
   );
 }
 
 export function OverviewView() {
-  const { user, settings } = useApp();
+  const { user } = useApp();
   const [data, setData] = useState<Overview | null>(null);
   const [hello, setHello] = useState("Welcome");
   useEffect(() => { setHello(greeting()); }, []);
   useEffect(() => { api<Overview>("/api/overview").then(setData).catch((e) => toast.error(e.message)); }, []);
   const first = user?.name.split(" ")[0];
   const c = data?.counts;
+  const fan = data?.recentCodes.slice(0, 3) ?? [];
+
+  const facts = c ? [
+    { label: "QR codes", value: c.qrCodes, href: "/codes" },
+    { label: "Products", value: c.products, href: "/products" },
+    { label: "Barcodes", value: c.barcodes, href: "/products" },
+    { label: "Units in stock", value: c.units, href: "/inventory" },
+  ] : [];
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-        <div>
-          <p className="text-xs font-medium text-slate-500 dark:text-slate-400">{settings.siteName} workspace · {user?.planName} plan</p>
-          <h1 className="mt-1 text-xl font-semibold tracking-tight sm:text-2xl">{hello}{first ? `, ${first}` : ""}</h1>
+    <div className="space-y-10">
+      {/* Hero */}
+      <section className="relative overflow-hidden rounded-[2rem] bg-zinc-950 px-6 py-8 text-white sm:px-10 sm:py-10">
+        <div className="pointer-events-none absolute inset-0 opacity-90" aria-hidden
+          style={{ background: "radial-gradient(70% 90% at 85% 10%, hsl(var(--brand) / .55), transparent 60%), radial-gradient(50% 70% at 10% 110%, hsl(var(--accent) / .35), transparent 60%)" }} />
+        <div className="relative grid items-center gap-8 md:grid-cols-[1fr_auto]">
+          <div>
+            <p className="text-xs font-medium uppercase tracking-[0.16em] text-white/60">{user?.planName} plan</p>
+            <h1 className="mt-2 font-serif text-3xl font-medium leading-tight tracking-[-0.02em] sm:text-[2.6rem]">{hello}{first ? `, ${first}` : ""}.</h1>
+            <div className="mt-6 flex flex-wrap gap-2">
+              <Link href="/generator" className="inline-flex h-11 items-center gap-2 rounded-full bg-white px-5 text-sm font-semibold text-zinc-900 shadow-sm transition hover:-translate-y-px hover:shadow-md active:scale-[.98]">
+                <Plus className="h-4 w-4" aria-hidden /> Create QR code
+              </Link>
+              <Link href="/barcodes" className="inline-flex h-11 items-center gap-2 rounded-full bg-white/10 px-4 text-sm font-medium ring-1 ring-inset ring-white/20 transition hover:bg-white/15"><Barcode className="h-4 w-4" aria-hidden /> Barcode</Link>
+              <Link href="/scanner" className="inline-flex h-11 items-center gap-2 rounded-full bg-white/10 px-4 text-sm font-medium ring-1 ring-inset ring-white/20 transition hover:bg-white/15"><ScanLine className="h-4 w-4" aria-hidden /> Scan</Link>
+            </div>
+            <dl className="mt-7 flex flex-wrap gap-x-7 gap-y-3">
+              {c ? facts.map((f) => (
+                <Link key={f.label} href={f.href} className="group">
+                  <dt className="text-[11px] text-white/55 group-hover:text-white/80">{f.label}</dt>
+                  <dd className="font-serif text-2xl tabular-nums">{formatNumber(f.value)}</dd>
+                </Link>
+              )) : Array.from({ length: 4 }, (_, i) => <Skeleton key={i} className="h-11 w-20 bg-white/10" />)}
+            </dl>
+          </div>
+          {fan.length > 0 && (
+            <div className="relative mx-auto hidden h-44 w-56 md:block" aria-hidden>
+              {fan.map((q, i) => (
+                <div key={q.id} className="absolute left-1/2 top-1/2 h-32 w-32 rounded-2xl bg-white p-2.5 shadow-2xl transition-transform duration-300"
+                  style={{ transform: `translate(-50%,-50%) translateX(${(i - (fan.length - 1) / 2) * 44}px) rotate(${(i - (fan.length - 1) / 2) * 9}deg)`, zIndex: i === Math.floor(fan.length / 2) ? 3 : 1 }}>
+                  <QrThumb payload={q.payload} design={q.design} idKey="fan" className="h-full w-full" />
+                </div>
+              ))}
+            </div>
+          )}
         </div>
-        <div className="grid grid-cols-3 gap-2 sm:flex">
-          <LinkButton href="/generator" size="lg" className="px-3 sm:px-5"><QrCode className="h-4 w-4" /> <span>Create QR</span></LinkButton>
-          <LinkButton href="/barcodes" size="lg" variant="outline" className="px-3 sm:px-5"><Barcode className="h-4 w-4" /> <span>Barcode</span></LinkButton>
-          <LinkButton href="/scanner" size="lg" variant="outline" className="px-3 sm:px-5"><ScanLine className="h-4 w-4" /> <span>Scan</span></LinkButton>
+      </section>
+
+      {c && c.lowStock > 0 && (
+        <Link href="/products?low=1" className="flex items-center gap-3 rounded-2xl bg-amber-50 px-4 py-3 text-sm text-amber-900 ring-1 ring-inset ring-amber-200 transition hover:bg-amber-100 dark:bg-amber-500/10 dark:text-amber-100 dark:ring-amber-500/20">
+          <AlertTriangle className="h-4 w-4 shrink-0" aria-hidden />
+          <span className="flex-1"><b className="font-semibold">{c.lowStock}</b> {c.lowStock === 1 ? "product needs" : "products need"} restocking</span>
+          <ArrowRight className="h-4 w-4" aria-hidden />
+        </Link>
+      )}
+
+      {/* Quick create */}
+      <section>
+        <Heading>Quick create</Heading>
+        <div className="grid grid-cols-4 gap-2 sm:grid-cols-8">
+          {QUICK.map((id) => {
+            const t = getType(id);
+            return (
+              <Link key={id} href={`/generator?type=${id}`} title={t.description}
+                className="group flex flex-col items-center gap-2 rounded-2xl px-1 py-3 text-center transition hover:-translate-y-0.5 hover:bg-white hover:shadow-card dark:hover:bg-slate-900">
+                <TypeGlyph brand={t.brand} icon={t.icon} size="lg" className="transition-transform duration-200 group-hover:scale-105" />
+                <span className="w-full truncate text-xs font-medium text-slate-700 dark:text-slate-300">{t.label}</span>
+              </Link>
+            );
+          })}
         </div>
-      </div>
+      </section>
 
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
-        {c ? (
-          <>
-            <StatCard label="QR codes" value={formatNumber(c.qrCodes)} icon={<QrCode />} href="/codes" />
-            <StatCard label="Barcodes" value={formatNumber(c.barcodes)} hint="On active products" icon={<Barcode />} href="/products" />
-            <StatCard label="Products" value={formatNumber(c.products)} icon={<Package />} href="/products" />
-            <StatCard label="Units in stock" value={formatNumber(c.units)} icon={<Boxes />} href="/inventory" />
-            <StatCard label="Low-stock alerts" value={c.lowStock} icon={<AlertTriangle />} href="/products?low=1" tone={c.lowStock ? "warn" : undefined} hint={c.lowStock ? "Need restocking" : "All good"} />
-          </>
-        ) : Array.from({ length: 5 }, (_, i) => <Skeleton key={i} className="h-[88px] rounded-xl" />)}
-      </div>
-
-      <div className="grid gap-6 lg:grid-cols-3">
-        <div className="space-y-6 lg:col-span-2">
-          <Panel title="Recently created codes" href="/codes">
-            {!data ? <LoadingSkeleton rows={3} className="p-3" /> : data.recentCodes.length === 0 ? (
-              <EmptyState compact icon={<QrCode className="h-5 w-5" />} title="No saved codes yet" action={<LinkButton href="/generator" size="sm">Create your first QR code</LinkButton>}>
-                Codes you save or make dynamic appear here.
-              </EmptyState>
-            ) : (
-              <ul>
-                {data.recentCodes.map((q) => (
+      <div className="grid gap-10 lg:grid-cols-[minmax(0,1fr)_340px]">
+        {/* Recent codes */}
+        <section>
+          <Heading href="/codes">Recent QR codes</Heading>
+          {!data ? (
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">{Array.from({ length: 3 }, (_, i) => <Skeleton key={i} className="aspect-[4/5] rounded-2xl" />)}</div>
+          ) : data.recentCodes.length === 0 ? (
+            <EmptyState icon={<QrCode />} title="Your first QR code is a minute away" action={<LinkButton href="/generator"><Plus className="h-4 w-4" /> Create a QR code</LinkButton>}>
+              Saved and dynamic codes appear here.
+            </EmptyState>
+          ) : (
+            <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+              {data.recentCodes.map((q) => {
+                const t = getType(q.type);
+                return (
                   <li key={q.id}>
-                    <Link href={`/generator?id=${q.id}`} className="flex items-center gap-3 rounded-lg px-3 py-2 hover:bg-slate-50 dark:hover:bg-slate-800/50">
-                      <QrThumb payload={q.payload} design={q.design} className="h-9 w-9 shrink-0" />
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-medium">{q.name}</p>
-                        <p className="text-xs text-slate-500">{getType(q.type).label} · {formatDate(q.createdAt)}</p>
+                    <Link href={`/generator?id=${q.id}`} className="group block rounded-2xl border border-slate-200/80 bg-white p-3 transition duration-200 hover:-translate-y-0.5 hover:shadow-pop dark:border-slate-800 dark:bg-slate-900">
+                      <div className="relative rounded-xl bg-slate-50 p-4 dark:bg-white">
+                        <QrThumb payload={q.payload} design={q.design} className="mx-auto aspect-square w-full max-w-[140px]" />
+                        <ArrowUpRight className="absolute right-2 top-2 h-4 w-4 text-slate-400 opacity-0 transition group-hover:opacity-100" aria-hidden />
                       </div>
-                      <Badge tone={q.isDynamic ? "violet" : "slate"}>{q.isHosted ? "Hosted" : q.isDynamic ? "Dynamic" : "Static"}</Badge>
+                      <div className="mt-3 flex items-center gap-2">
+                        <TypeGlyph brand={t.brand} icon={t.icon} size="sm" className="h-6 w-6 rounded-md [&>svg]:h-3.5 [&>svg]:w-3.5" />
+                        <p className="min-w-0 flex-1 truncate text-sm font-medium">{q.name}</p>
+                      </div>
+                      <div className="mt-1.5 flex items-center justify-between gap-2 text-[11px] text-slate-500">
+                        <span className="truncate">{formatDate(q.createdAt)}</span>
+                        <Badge tone={q.isDynamic ? "violet" : "slate"}>{q.isHosted ? "Hosted" : q.isDynamic ? "Dynamic" : "Static"}</Badge>
+                      </div>
                     </Link>
                   </li>
+                );
+              })}
+            </ul>
+          )}
+        </section>
+
+        <div className="space-y-10">
+          {/* Activity timeline */}
+          <section>
+            <Heading href="/inventory">Inventory activity</Heading>
+            {!data ? <LoadingSkeleton rows={3} /> : data.activity.length === 0 ? (
+              <EmptyState compact icon={<Warehouse />} title="No stock movements yet" action={<LinkButton href="/products/new" size="sm" variant="outline">Add a product</LinkButton>} />
+            ) : (
+              <ol className="relative space-y-4 border-l border-slate-200 pl-5 dark:border-slate-800">
+                {data.activity.slice(0, 6).map((t) => (
+                  <li key={t.id} className="relative">
+                    <span className={cn("absolute -left-[25px] top-1.5 h-2 w-2 rounded-full ring-4 ring-slate-50 dark:ring-slate-950", TX[t.type]?.[1] || "bg-zinc-400")} aria-hidden />
+                    <div className="flex items-baseline justify-between gap-3">
+                      <Link href={`/products/${t.product.id}`} className="truncate text-sm font-medium hover:text-brand">{t.product.name}</Link>
+                      <span className={cn("shrink-0 text-sm font-medium tabular-nums", t.quantity > 0 ? "text-emerald-600" : t.quantity < 0 ? "text-rose-600" : "text-slate-400")}>{t.quantity > 0 ? `+${t.quantity}` : t.quantity || "—"}</span>
+                    </div>
+                    <p className="text-xs text-slate-500">{TX[t.type]?.[0] || t.type} · {formatDate(t.createdAt, true)}</p>
+                  </li>
                 ))}
-              </ul>
+              </ol>
             )}
-          </Panel>
+          </section>
 
-          <Panel title="Recent inventory activity" href="/inventory">
-            {!data ? <LoadingSkeleton rows={3} className="p-3" /> : data.activity.length === 0 ? (
-              <EmptyState compact icon={<Warehouse className="h-5 w-5" />} title="No inventory activity yet" action={<LinkButton href="/products/new" size="sm">Add a product</LinkButton>}>
-                Stock movements and product changes are recorded here.
-              </EmptyState>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="table">
-                  <thead><tr><th>Product</th><th>Action</th><th className="text-right">Change</th><th className="hidden sm:table-cell">When</th></tr></thead>
-                  <tbody>
-                    {data.activity.map((t) => (
-                      <tr key={t.id}>
-                        <td><Link href={`/products/${t.product.id}`} className="font-medium hover:text-brand">{t.product.name}</Link></td>
-                        <td><Badge tone={TX[t.type]?.[1] || "slate"}>{TX[t.type]?.[0] || t.type}</Badge></td>
-                        <td className={`text-right font-medium tabular-nums ${t.quantity > 0 ? "text-emerald-600" : t.quantity < 0 ? "text-rose-600" : "text-slate-400"}`}>{t.quantity > 0 ? `+${t.quantity}` : t.quantity || "—"}</td>
-                        <td className="hidden whitespace-nowrap text-xs text-slate-500 sm:table-cell">{formatDate(t.createdAt, true)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </Panel>
-        </div>
-
-        <div className="space-y-6">
-          <Panel title="Recently updated products" href="/products">
-            {!data ? <LoadingSkeleton rows={3} className="p-3" /> : data.recentProducts.length === 0 ? (
-              <EmptyState compact icon={<Package className="h-5 w-5" />} title="No products yet" action={<LinkButton href="/products/new" size="sm">Add product</LinkButton>}>
-                Track SKUs, barcodes, prices and stock.
-              </EmptyState>
-            ) : (
-              <ul>
+          {/* Products */}
+          {data && data.recentProducts.length > 0 && (
+            <section>
+              <Heading href="/products">Products</Heading>
+              <ul className="space-y-1">
                 {data.recentProducts.map((p) => (
                   <li key={p.id}>
-                    <Link href={`/products/${p.id}`} className="flex items-center gap-3 rounded-lg px-3 py-2 hover:bg-slate-50 dark:hover:bg-slate-800/50">
+                    <Link href={`/products/${p.id}`} className="flex items-center gap-3 rounded-xl px-2 py-1.5 transition hover:bg-white dark:hover:bg-slate-900">
                       <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-slate-100 text-[11px] font-semibold text-slate-500 dark:bg-slate-800">{p.name.slice(0, 2).toUpperCase()}</span>
                       <div className="min-w-0 flex-1"><p className="truncate text-sm font-medium">{p.name}</p><p className="truncate font-mono text-[11px] text-slate-500">{p.sku}</p></div>
-                      <span className={`text-sm font-medium tabular-nums ${p.stock <= p.lowStockAt ? "text-amber-600" : ""}`}>{p.stock}</span>
+                      <span className={cn("text-sm font-medium tabular-nums", p.stock <= p.lowStockAt && "text-amber-600")}>{p.stock}</span>
                     </Link>
                   </li>
                 ))}
               </ul>
-            )}
-          </Panel>
+            </section>
+          )}
 
-          <Panel title="Quick actions">
-            <ul className="text-sm">
+          {/* Tools */}
+          <section>
+            <Heading>Tools</Heading>
+            <div className="flex flex-wrap gap-2">
               {[
-                { href: "/products/new", icon: PackagePlus, label: "Add a product" },
-                { href: "/products?import=1", icon: FileUp, label: "Import products (CSV/XLSX)" },
-                { href: "/upi", icon: IndianRupee, label: "UPI payment QR & standee" },
-                { href: "/bulk", icon: FileSpreadsheet, label: "Bulk generate codes" },
+                { href: "/products/new", icon: PackagePlus, label: "Add product" },
+                { href: "/products?import=1", icon: FileUp, label: "Import CSV/XLSX" },
+                { href: "/upi", icon: IndianRupee, label: "UPI standee" },
+                { href: "/bulk", icon: FileSpreadsheet, label: "Bulk generate" },
                 { href: "/studio", icon: Palette, label: "Design studio" },
+                { href: "/products", icon: Package, label: "Catalogue" },
               ].map((a) => (
-                <li key={a.href}>
-                  <Link href={a.href} className="flex items-center gap-3 rounded-lg px-3 py-2 text-slate-700 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-800/50">
-                    <a.icon className="h-4 w-4 text-slate-400" aria-hidden /> {a.label}
-                  </Link>
-                </li>
+                <Link key={a.href} href={a.href} className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:border-slate-300 hover:shadow-card dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300">
+                  <a.icon className="h-3.5 w-3.5 text-slate-400" aria-hidden /> {a.label}
+                </Link>
               ))}
-            </ul>
-          </Panel>
+            </div>
+          </section>
         </div>
       </div>
     </div>

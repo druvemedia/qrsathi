@@ -285,9 +285,15 @@ export function LoadingSkeleton({ rows = 5, className }: { rows?: number; classN
 
 export function EmptyState({ icon, title, children, action, compact }: { icon?: React.ReactNode; title: string; children?: React.ReactNode; action?: React.ReactNode; compact?: boolean }) {
   return (
-    <div className={cn("flex flex-col items-center justify-center rounded-xl border border-dashed border-slate-300 px-6 text-center dark:border-slate-700", compact ? "py-8" : "py-14")}>
-      {icon && <div className="mb-3 rounded-xl bg-slate-100 p-2.5 text-slate-500 dark:bg-slate-800 dark:text-slate-400">{icon}</div>}
-      <h3 className="text-sm font-semibold">{title}</h3>
+    <div className={cn("dot-grid relative flex flex-col items-center justify-center overflow-hidden rounded-3xl bg-slate-50/80 px-6 text-center ring-1 ring-inset ring-slate-200/70 dark:bg-slate-900/40 dark:ring-slate-800", compact ? "py-9" : "py-16")}>
+      {icon && (
+        <div className="relative mb-4" aria-hidden>
+          <div className="absolute inset-0 -z-0 scale-150 rounded-full bg-brand/15 blur-2xl" />
+          <div className="absolute -right-3 -top-2 h-10 w-10 rotate-12 rounded-xl bg-white/70 ring-1 ring-slate-200 dark:bg-slate-800/70 dark:ring-slate-700" />
+          <div className="relative grid h-14 w-14 place-items-center rounded-2xl bg-white text-brand shadow-pop ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-700 [&>svg]:h-6 [&>svg]:w-6">{icon}</div>
+        </div>
+      )}
+      <h3 className="font-serif text-lg font-medium">{title}</h3>
       {children && <p className="mt-1 max-w-sm text-sm text-slate-500 dark:text-slate-400">{children}</p>}
       {action && <div className="mt-4">{action}</div>}
     </div>
@@ -332,13 +338,13 @@ export function Breadcrumbs({ items }: { items: Crumb[] }) {
 
 export function PageHeader({ title, description, actions, icon, breadcrumbs }: { title: string; description?: React.ReactNode; actions?: React.ReactNode; icon?: React.ReactNode; breadcrumbs?: Crumb[] }) {
   return (
-    <div className="mb-6">
+    <div className="mb-7">
       {breadcrumbs && <Breadcrumbs items={breadcrumbs} />}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div className="flex min-w-0 items-start gap-3">
-          {icon && <div className="hidden h-10 w-10 shrink-0 place-items-center rounded-lg border border-slate-200 bg-white text-slate-600 shadow-card dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 sm:grid [&>svg]:h-5 [&>svg]:w-5">{icon}</div>}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div className="flex min-w-0 items-center gap-4">
+          {icon && <div className="hidden h-12 w-12 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-brand/15 to-accent/10 text-brand ring-1 ring-inset ring-brand/15 sm:grid [&>svg]:h-5 [&>svg]:w-5">{icon}</div>}
           <div className="min-w-0">
-            <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">{title}</h1>
+            <h1 className="font-serif text-[1.65rem] font-medium leading-tight tracking-[-0.02em] sm:text-[2rem]">{title}</h1>
             {description && <p className="mt-1 max-w-2xl text-sm text-slate-500 dark:text-slate-400">{description}</p>}
           </div>
         </div>

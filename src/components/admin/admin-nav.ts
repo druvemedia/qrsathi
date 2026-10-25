@@ -52,6 +52,10 @@ export const ADMIN_NAV: AdminNavGroup[] = [
 
 export const ADMIN_NAV_ITEMS = ADMIN_NAV.flatMap((g) => g.items);
 
+export function adminGroupOf(href: string) {
+  return ADMIN_NAV.find((g) => g.items.some((i) => i.href === href))?.label;
+}
+
 export function activeAdminItem(pathname: string) {
   return ADMIN_NAV_ITEMS.filter((i) => pathname === i.href || (i.href !== "/admin" && pathname.startsWith(i.href + "/")))
     .sort((a, b) => b.href.length - a.href.length)[0];

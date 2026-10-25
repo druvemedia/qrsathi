@@ -224,7 +224,7 @@ export function BulkTool() {
       <div className="grid gap-6 lg:grid-cols-3">
         <Card className="p-5">
           <p className="text-xs font-semibold uppercase tracking-wide text-brand">Step 1</p>
-          <h2 className="font-display text-lg font-bold">QR type</h2>
+          <h2 className="font-serif text-lg font-medium">QR type</h2>
           <Select className="mt-3" aria-label="QR type" value={typeId} onChange={(e) => changeType(e.target.value)}>
             {BULK_TYPES.map((t) => <option key={t.id} value={t.id}>{t.label}</option>)}
           </Select>
@@ -233,7 +233,7 @@ export function BulkTool() {
         </Card>
         <Card className="p-5 lg:col-span-2">
           <p className="text-xs font-semibold uppercase tracking-wide text-brand">Step 2</p>
-          <h2 className="font-display text-lg font-bold">Upload CSV or Excel</h2>
+          <h2 className="font-serif text-lg font-medium">Upload CSV or Excel</h2>
           <div className="mt-3 flex flex-col items-start gap-3 rounded-xl border-2 border-dashed border-slate-200 p-5 dark:border-slate-800 sm:flex-row sm:items-center"
             onDragOver={(e) => e.preventDefault()} onDrop={(e) => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) parseFile(f); }}>
             <FileSpreadsheet className="h-10 w-10 text-slate-300" />
@@ -250,7 +250,7 @@ export function BulkTool() {
       {headers.length > 0 && (
         <Card className="p-5">
           <p className="text-xs font-semibold uppercase tracking-wide text-brand">Step 3</p>
-          <h2 className="font-display text-lg font-bold">Map columns</h2>
+          <h2 className="font-serif text-lg font-medium">Map columns</h2>
           <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             <Field label="File name / label">
               <Select value={nameCol} onChange={(e) => setNameCol(e.target.value)}>
@@ -289,7 +289,7 @@ export function BulkTool() {
           <div className="flex flex-col gap-4 p-5 lg:flex-row lg:items-center lg:justify-between">
             <div>
               <p className="text-xs font-semibold uppercase tracking-wide text-brand">Step 4</p>
-              <h2 className="font-display text-lg font-bold">Preview & generate</h2>
+              <h2 className="font-serif text-lg font-medium">Preview & generate</h2>
               <div className="mt-2 flex flex-wrap gap-2 text-sm">
                 <Badge tone="green"><CheckCircle2 className="h-3 w-3" /> {good.length} valid</Badge>
                 {bad.length > 0 && <Badge tone="rose"><XCircle className="h-3 w-3" /> {bad.length} with errors</Badge>}

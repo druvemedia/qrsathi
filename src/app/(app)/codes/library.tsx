@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { BarChart3, Copy, CopyPlus, Download, FlaskConical, Heart, MoreHorizontal, Pencil, PencilLine, Plus, QrCode, Search, Trash2 } from "lucide-react";
+import { BarChart3, Copy, CopyPlus, Download, FlaskConical, Heart, MoreHorizontal, Pencil, PencilLine, Plus, QrCode, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import type { QrDto } from "@/lib/qr-service";
 import { QR_TYPES, getType } from "@/lib/qr-types";
@@ -9,7 +9,8 @@ import { renderQr } from "@/lib/qr-render";
 import { downloadBlob, exportSvg } from "@/lib/qr-export";
 import { api } from "@/lib/fetcher";
 import { formatDate, formatNumber, safeFilename, cn } from "@/lib/utils";
-import { Badge, Button, Card, EmptyState, Input, LinkButton, Modal, Segmented, Select, Skeleton, StatCard } from "@/components/ui";
+import { Badge, Button, EmptyState, Input, LinkButton, Modal, SearchInput, Segmented, Select, Skeleton } from "@/components/ui";
+import { TypeGlyph } from "@/components/brand-icon";
 import { QrThumb } from "@/components/qr/preview";
 import { trackDownload } from "@/components/qr/export-panel";
 import { useApp } from "@/components/providers";
@@ -70,44 +71,27 @@ export function Library() {
     }
   };
 
-  const recent = items?.slice().sort((a, b) => +new Date(b.updatedAt) - +new Date(a.updatedAt)).slice(0, 4) ?? [];
   const totalScans = items?.reduce((a, i) => a + (i.scans || 0), 0) ?? 0;
 
   return (
     <div className="space-y-8">
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        {usage ? (
-          <>
-            <StatCard label="Saved QR codes" value={formatNumber(usage.usage.saved)} hint={`of ${formatNumber(usage.plan.limits.savedQr)} on ${usage.plan.name}`} />
-            <StatCard label="Dynamic QR" value={`${usage.usage.dynamic}/${usage.plan.limits.dynamic}`} hint="Editable short links" />
-            <StatCard label="Hosted pages" value={`${usage.usage.hosted}/${usage.plan.limits.hosted}`} hint="Menus, link-in-bio, coupons…" />
-            <StatCard label="Total scans" value={formatNumber(totalScans)} hint={<Link className="text-brand" href="/analytics">View analytics →</Link>} />
-          </>
-        ) : Array.from({ length: 4 }, (_, i) => <Skeleton key={i} className="h-[118px]" />)}
-      </div>
-
-      {recent.length > 0 && (
-        <section>
-          <h2 className="mb-3 font-display text-lg font-bold">Recent</h2>
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-            {recent.map((qr) => (
-              <Link key={qr.id} href={`/generator?id=${qr.id}`} className="card group flex items-center gap-3 p-3 transition hover:border-brand/40">
-                <QrThumb payload={qr.payload} design={qr.design} className="h-12 w-12 shrink-0" />
-                <div className="min-w-0"><p className="truncate text-sm font-semibold group-hover:text-brand">{qr.name}</p><p className="text-xs text-slate-500">{formatDate(qr.updatedAt)}</p></div>
-              </Link>
-            ))}
+      {usage ? (
+        <div className="grid gap-x-8 gap-y-4 rounded-3xl border border-slate-200/80 bg-white px-6 py-5 dark:border-slate-800 dark:bg-slate-900 sm:grid-cols-2 lg:grid-cols-4">
+          <Meter label="Saved QR codes" used={usage.usage.saved} max={usage.plan.limits.savedQr} />
+          <Meter label="Dynamic QR" used={usage.usage.dynamic} max={usage.plan.limits.dynamic} />
+          <Meter label="Hosted pages" used={usage.usage.hosted} max={usage.plan.limits.hosted} />
+          <div>
+            <p className="text-xs text-slate-500">Total scans</p>
+            <p className="mt-1 flex items-baseline gap-2"><span className="font-serif text-2xl tabular-nums">{formatNumber(totalScans)}</span><Link className="text-xs font-medium text-brand hover:underline" href="/analytics">Analytics →</Link></p>
           </div>
-        </section>
-      )}
+        </div>
+      ) : <Skeleton className="h-[92px] rounded-3xl" />}
 
       <section>
         <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center">
-          <h2 className="font-display text-lg font-bold">Library</h2>
+          <h2 className="font-serif text-xl font-medium">Library {items && <span className="font-sans text-sm text-slate-400">{filtered.length}</span>}</h2>
           <div className="flex flex-1 flex-wrap items-center gap-2 lg:justify-end">
-            <div className="relative w-full sm:w-56">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-              <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search name, campaign, code" className="py-2 pl-9" aria-label="Search library" />
-            </div>
+            <SearchInput value={q} onChange={setQ} placeholder="Search name, campaign, code" aria-label="Search library" className="w-full sm:w-60" />
             <Select value={type} onChange={(e) => setType(e.target.value)} className="w-auto py-2" aria-label="Filter by type">
               <option value="">All types</option>
               {QR_TYPES.map((t) => <option key={t.id} value={t.id}>{t.label}</option>)}
@@ -123,15 +107,15 @@ export function Library() {
         ]} />
 
         {!items ? (
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">{Array.from({ length: 6 }, (_, i) => <Skeleton key={i} className="h-44" />)}</div>
+          <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-4">{Array.from({ length: 8 }, (_, i) => <Skeleton key={i} className="aspect-[4/5] rounded-2xl" />)}</div>
         ) : items.length === 0 ? (
-          <EmptyState icon={<QrCode className="h-6 w-6" />} title="No saved QR codes yet" action={<LinkButton href="/generator"><Plus className="h-4 w-4" /> Create your first QR</LinkButton>}>
+          <EmptyState icon={<QrCode />} title="No saved QR codes yet" action={<LinkButton href="/generator"><Plus className="h-4 w-4" /> Create your first QR</LinkButton>}>
             Generate a QR code and hit “Save” to keep it here. Dynamic QR codes and hosted pages are saved automatically.
           </EmptyState>
         ) : filtered.length === 0 ? (
-          <p className="py-10 text-center text-sm text-slate-500">No QR codes match these filters.</p>
+          <EmptyState compact icon={<QrCode />} title="Nothing matches these filters" action={<Button size="sm" variant="outline" onClick={() => { setQ(""); setType(""); setKind("all"); }}>Clear filters</Button>} />
         ) : (
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-4">
             {filtered.map((qr) => (
               <QrCard key={qr.id} qr={qr} onFavorite={() => patch(qr.id, { favorite: !qr.favorite }).catch((e) => toast.error(e.message))}
                 onRename={() => setRename(qr)} onDuplicate={() => duplicate(qr)} onDelete={() => setDel(qr)} onDownload={() => quickDownload(qr)} />
@@ -158,52 +142,67 @@ export function Library() {
   );
 }
 
+function Meter({ label, used, max }: { label: string; used: number; max: number }) {
+  const pct = max > 0 ? Math.min(100, Math.round((used / max) * 100)) : 0;
+  return (
+    <div>
+      <div className="flex items-baseline justify-between gap-2">
+        <p className="text-xs text-slate-500">{label}</p>
+        <p className="text-xs tabular-nums text-slate-500"><span className="font-serif text-2xl text-slate-900 dark:text-white">{formatNumber(used)}</span> / {formatNumber(max)}</p>
+      </div>
+      <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800" role="progressbar" aria-label={label} aria-valuenow={used} aria-valuemin={0} aria-valuemax={max}>
+        <div className={cn("h-full rounded-full transition-[width] duration-500", pct >= 90 ? "bg-amber-500" : "bg-brand")} style={{ width: `${pct}%` }} />
+      </div>
+    </div>
+  );
+}
+
 function QrCard({ qr, onFavorite, onRename, onDuplicate, onDelete, onDownload }: {
   qr: QrDto; onFavorite: () => void; onRename: () => void; onDuplicate: () => void; onDelete: () => void; onDownload: () => void;
 }) {
   const [menu, setMenu] = useState(false);
   const t = getType(qr.type);
+  const act = "rounded-lg p-1.5 text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900 dark:hover:bg-slate-800 dark:hover:text-white";
   return (
-    <Card className="group relative flex gap-4 p-4 transition hover:shadow-md">
-      <Link href={`/generator?id=${qr.id}`} className="shrink-0 rounded-xl bg-slate-50 p-2 dark:bg-slate-800" aria-label={`Edit ${qr.name}`}>
-        <QrThumb payload={qr.payload} design={qr.design} className="h-24 w-24" />
+    <div className="group relative flex flex-col rounded-2xl border border-slate-200/80 bg-white p-3 transition duration-200 hover:-translate-y-0.5 hover:shadow-pop dark:border-slate-800 dark:bg-slate-900">
+      <Link href={`/generator?id=${qr.id}`} className="relative block rounded-xl bg-slate-50 p-4 dark:bg-white" aria-label={`Edit ${qr.name}`}>
+        <QrThumb payload={qr.payload} design={qr.design} className="mx-auto aspect-square w-full max-w-[150px]" />
       </Link>
-      <div className="min-w-0 flex-1">
-        <div className="flex items-start justify-between gap-2">
-          <Link href={`/generator?id=${qr.id}`} className="truncate font-semibold hover:text-brand">{qr.name}</Link>
-          <button onClick={onFavorite} aria-label={qr.favorite ? "Remove from favourites" : "Add to favourites"} aria-pressed={qr.favorite} className="shrink-0 rounded-lg p-1 hover:bg-slate-100 dark:hover:bg-slate-800">
-            <Heart className={cn("h-4 w-4", qr.favorite ? "fill-rose-500 text-rose-500" : "text-slate-400")} />
+      <button onClick={onFavorite} aria-label={qr.favorite ? "Remove from favourites" : "Add to favourites"} aria-pressed={qr.favorite}
+        className={cn("absolute right-5 top-5 rounded-full bg-white/90 p-1.5 shadow-sm ring-1 ring-black/5 transition hover:scale-110", !qr.favorite && "opacity-0 focus-visible:opacity-100 group-hover:opacity-100")}>
+        <Heart className={cn("h-3.5 w-3.5", qr.favorite ? "fill-rose-500 text-rose-500" : "text-slate-500")} />
+      </button>
+      <div className="mt-3 flex min-w-0 items-center gap-2">
+        <TypeGlyph brand={t.brand} icon={t.icon} size="sm" className="h-6 w-6 rounded-md [&>svg]:h-3.5 [&>svg]:w-3.5" />
+        <Link href={`/generator?id=${qr.id}`} className="min-w-0 flex-1 truncate text-sm font-medium hover:text-brand">{qr.name}</Link>
+      </div>
+      <div className="mt-2 flex flex-wrap gap-1">
+        {qr.isHosted ? <Badge tone="violet">Hosted</Badge> : qr.isDynamic ? <Badge tone="violet">Dynamic</Badge> : <Badge tone="blue">Static</Badge>}
+        {qr.status !== "active" && <Badge tone="amber">{qr.status}</Badge>}
+        {qr.isDemo && <Badge tone="amber"><FlaskConical className="h-3 w-3" /> Demo</Badge>}
+      </div>
+      <p className="mt-2 text-[11px] text-slate-500">
+        {qr.isDynamic ? <>{formatNumber(qr.scans || 0)} scans · </> : null}{formatDate(qr.updatedAt)}
+      </p>
+      <div className="mt-2 flex items-center gap-0.5 border-t border-slate-100 pt-2 dark:border-slate-800">
+        <Link href={`/generator?id=${qr.id}`} className={act} title="Edit" aria-label="Edit"><PencilLine className="h-4 w-4" /></Link>
+        <button onClick={onDownload} className={act} title="Download PNG" aria-label="Download PNG"><Download className="h-4 w-4" /></button>
+        {qr.isDynamic && <Link href={`/analytics/${qr.id}`} className={act} title="Analytics" aria-label="Analytics"><BarChart3 className="h-4 w-4" /></Link>}
+        <div className="relative ml-auto">
+          <button onClick={() => setMenu((m) => !m)} onBlur={() => setTimeout(() => setMenu(false), 150)} className={act} aria-label="More actions" aria-expanded={menu}>
+            <MoreHorizontal className="h-4 w-4" />
           </button>
-        </div>
-        <div className="mt-1 flex flex-wrap gap-1.5">
-          <Badge>{t.label}</Badge>
-          {qr.isHosted ? <Badge tone="violet">Hosted</Badge> : qr.isDynamic ? <Badge tone="violet">Dynamic</Badge> : <Badge tone="blue">Static</Badge>}
-          {qr.status !== "active" && <Badge tone="amber">{qr.status}</Badge>}
-          {qr.isDemo && <Badge tone="amber"><FlaskConical className="h-3 w-3" /> Demo</Badge>}
-        </div>
-        <p className="mt-2 text-xs text-slate-500">
-          {qr.isDynamic ? <>{formatNumber(qr.scans || 0)} scans · </> : null}Updated {formatDate(qr.updatedAt)}
-        </p>
-        <div className="mt-3 flex items-center gap-1">
-          <Link href={`/generator?id=${qr.id}`} className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-900 dark:hover:bg-slate-800 dark:hover:text-white" title="Edit"><PencilLine className="h-4 w-4" /></Link>
-          <button onClick={onDownload} className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-900 dark:hover:bg-slate-800 dark:hover:text-white" title="Download PNG" aria-label="Download PNG"><Download className="h-4 w-4" /></button>
-          {qr.isDynamic && <Link href={`/analytics/${qr.id}`} className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-900 dark:hover:bg-slate-800 dark:hover:text-white" title="Analytics"><BarChart3 className="h-4 w-4" /></Link>}
-          <div className="relative ml-auto">
-            <button onClick={() => setMenu((m) => !m)} onBlur={() => setTimeout(() => setMenu(false), 150)} className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800" aria-label="More actions" aria-expanded={menu}>
-              <MoreHorizontal className="h-4 w-4" />
-            </button>
-            {menu && (
-              <div className="card absolute bottom-9 right-0 z-20 w-44 origin-bottom-right animate-dropdown-in p-1 shadow-xl">
-                <MenuItem icon={Pencil} onClick={onRename}>Rename</MenuItem>
-                <MenuItem icon={CopyPlus} onClick={onDuplicate}>Duplicate</MenuItem>
-                {qr.shortCode && <MenuItem icon={Copy} onClick={() => { navigator.clipboard.writeText(qr.payload); toast.success("Link copied"); }}>Copy short link</MenuItem>}
-                <MenuItem icon={Trash2} onClick={onDelete} danger>Delete</MenuItem>
-              </div>
-            )}
-          </div>
+          {menu && (
+            <div className="card absolute bottom-9 right-0 z-20 w-44 origin-bottom-right animate-dropdown-in p-1 shadow-xl">
+              <MenuItem icon={Pencil} onClick={onRename}>Rename</MenuItem>
+              <MenuItem icon={CopyPlus} onClick={onDuplicate}>Duplicate</MenuItem>
+              {qr.shortCode && <MenuItem icon={Copy} onClick={() => { navigator.clipboard.writeText(qr.payload); toast.success("Link copied"); }}>Copy short link</MenuItem>}
+              <MenuItem icon={Trash2} onClick={onDelete} danger>Delete</MenuItem>
+            </div>
+          )}
         </div>
       </div>
-    </Card>
+    </div>
   );
 }
 

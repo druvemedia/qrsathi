@@ -16,7 +16,7 @@ import { addHistory, loadHistory, onHistoryChange, type HistoryEntry } from "@/l
 import { downloadBlob } from "@/lib/qr-export";
 import { api } from "@/lib/fetcher";
 import type { ProductDto } from "@/lib/products";
-import { Alert, Badge, Button, Card, Disclosure, Field, Kbd, Modal, Select, Spinner, Switch, Tooltip } from "@/components/ui";
+import { Alert, Badge, Button, Card, Disclosure, Field, Kbd, Modal, Select, Spinner, Switch, Tooltip, EmptyState } from "@/components/ui";
 import { useApp } from "@/components/providers";
 import { cn, truncate } from "@/lib/utils";
 
@@ -98,9 +98,9 @@ export function Scanner() {
       <div className="space-y-3"
         onDragOver={(e) => { e.preventDefault(); setDrag(true); }} onDragLeave={(e) => { if (e.currentTarget === e.target) setDrag(false); }}
         onDrop={(e) => { e.preventDefault(); setDrag(false); const f = e.dataTransfer.files[0]; if (f) scanFile(f); }}>
-        <div className={cn("relative rounded-xl transition", drag && "ring-2 ring-brand ring-offset-2 ring-offset-slate-50 dark:ring-offset-slate-950")}>
+        <div className={cn("relative rounded-3xl transition", drag && "ring-2 ring-brand ring-offset-2 ring-offset-slate-50 dark:ring-offset-slate-950")}>
           <CameraScanner filter={filter} onHits={(l) => onHits(l, "camera")} paused={!continuous && hits.length > 0} onResume={() => setHits([])} autostart={sp.get("camera") === "1"} />
-          {drag && <div className="pointer-events-none absolute inset-0 grid place-items-center rounded-xl bg-brand/10 text-sm font-medium text-brand">Drop the image to scan it</div>}
+          {drag && <div className="pointer-events-none absolute inset-0 grid place-items-center rounded-3xl bg-brand/10 text-sm font-medium text-brand">Drop the image to scan it</div>}
         </div>
 
         <input ref={fileInput} type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) scanFile(f); e.target.value = ""; }} />
@@ -153,11 +153,9 @@ export function Scanner() {
             </div>
           </>
         ) : (
-          <Card className="p-6 text-center">
-            <ScanLine className="mx-auto mb-2 h-6 w-6 text-slate-300" aria-hidden />
-            <p className="text-sm font-medium">Results appear here</p>
-            <p className="mt-1 text-xs text-slate-500">You&apos;ll see the code type and its content before anything opens.</p>
-          </Card>
+          <EmptyState compact icon={<ScanLine />} title="Results appear here">
+            You&apos;ll see the code type and its content before anything opens.
+          </EmptyState>
         )}
         {history.length > 0 && (
           <Card>
@@ -272,7 +270,15 @@ function CameraScanner({ filter, onHits, paused, onResume, autostart }: { filter
   }, [deviceId, facing, stop, tick]);
 
   useEffect(() => stop, [stop]);
-  useEffect(() => { if (autostart) start(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [autostart]);
+  // Know up front whether a camera can work here, so no Start button is offered where it can't.
+  useEffect(() => {
+    if (!window.isSecureContext) setState("insecure");
+    else if (!navigator.mediaDevices?.getUserMedia) setState("unsupported");
+  }, []);
+  useEffect(() => {
+    if (autostart) start();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autostart]);
 
   const track = () => stream.current?.getVideoTracks()[0];
   const toggleTorch = async () => {
@@ -310,15 +316,18 @@ function CameraScanner({ filter, onHits, paused, onResume, autostart }: { filter
   const iconBtn = "grid h-10 w-10 place-items-center rounded-full bg-slate-950/60 text-white backdrop-blur transition hover:bg-slate-950/80";
 
   return (
-    <Card className="overflow-hidden">
-      <div className="relative aspect-[4/3] w-full bg-slate-950 sm:aspect-video">
+    <div className="overflow-hidden rounded-3xl bg-zinc-950 shadow-pop ring-1 ring-black/10 dark:ring-white/10">
+      <div className="relative aspect-[4/3] w-full sm:aspect-video">
         <video ref={video} className={cn("h-full w-full object-cover", state !== "live" && "hidden", facing === "user" && !deviceId && "-scale-x-100")} playsInline muted />
         <canvas ref={canvas} className="hidden" />
         {state === "live" && (
           <>
             <div className="pointer-events-none absolute inset-0 grid place-items-center">
-              <div className="relative h-[60%] w-[70%] max-w-md rounded-2xl border-2 border-white/90 shadow-[0_0_0_9999px_rgba(9,9,11,.45)]">
-                <div className="absolute inset-x-5 top-1/2 h-0.5 animate-pulse bg-brand shadow-[0_0_12px_hsl(var(--brand))]" />
+              <div className="relative h-[60%] w-[70%] max-w-md rounded-3xl shadow-[0_0_0_9999px_rgba(9,9,11,.45)]">
+                {["left-0 top-0 border-l-[3px] border-t-[3px] rounded-tl-3xl", "right-0 top-0 border-r-[3px] border-t-[3px] rounded-tr-3xl", "left-0 bottom-0 border-l-[3px] border-b-[3px] rounded-bl-3xl", "right-0 bottom-0 border-r-[3px] border-b-[3px] rounded-br-3xl"].map((c) => (
+                  <span key={c} className={cn("absolute h-10 w-10 border-white", c)} />
+                ))}
+                <div className="absolute inset-x-6 top-1/2 h-0.5 animate-pulse rounded-full bg-brand shadow-[0_0_12px_hsl(var(--brand))]" />
               </div>
             </div>
             <p className="pointer-events-none absolute inset-x-0 top-3 text-center text-xs font-medium text-white/90 [text-shadow:0_1px_2px_rgb(0_0_0/.6)]">Point your camera at a QR code or barcode</p>
@@ -343,12 +352,12 @@ function CameraScanner({ filter, onHits, paused, onResume, autostart }: { filter
           </>
         )}
         {state !== "live" && (
-          <div className="absolute inset-0 grid place-items-center p-6 text-center text-white">
+          <div className="absolute inset-0 grid place-items-center p-6 text-center text-white" style={{ background: "radial-gradient(60% 70% at 50% 30%, hsl(var(--brand) / .35), transparent 70%)" }}>
             <div className="max-w-sm">
               {messages[state] ? (
                 <><CameraOff className="mx-auto h-9 w-9 text-rose-300" aria-hidden /><p className="mt-3 font-medium">{messages[state]![0]}</p><p className="mt-1 text-sm text-slate-300">{messages[state]![1]}</p></>
               ) : (
-                <><span className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-white/10"><ScanLine className="h-7 w-7" aria-hidden /></span>
+                <><span className="mx-auto grid h-16 w-16 place-items-center rounded-3xl bg-white/10 ring-1 ring-inset ring-white/15"><ScanLine className="h-8 w-8" aria-hidden /></span>
                   <p className="mt-4 text-base font-medium">Point your camera at a QR code or barcode</p>
                   <p className="mt-1 text-sm text-slate-400">Your browser will ask for permission. Video stays on your device.</p></>
               )}
@@ -364,7 +373,7 @@ function CameraScanner({ filter, onHits, paused, onResume, autostart }: { filter
           </div>
         )}
       </div>
-    </Card>
+    </div>
   );
 }
 
@@ -477,7 +486,7 @@ function ResultCard({ hit, onClear }: { hit: ScanHit; onClear: () => void }) {
       <div className="mb-4 flex items-start justify-between gap-3">
         <div className="flex items-center gap-2.5">
           <span className="grid h-9 w-9 place-items-center rounded-xl bg-brand/10 text-brand"><Icon className="h-4 w-4" /></span>
-          <div><p className="text-xs text-slate-500">{hit.formatLabel}</p><p className="font-display font-bold">{KIND_LABELS[kind]}</p></div>
+          <div><p className="text-xs text-slate-500">{hit.formatLabel}</p><p className="font-serif text-lg font-medium">{KIND_LABELS[kind]}</p></div>
         </div>
         {(kind === "url" || kind === "upi") && <RiskBadge notes={notes} />}
       </div>

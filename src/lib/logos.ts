@@ -1,9 +1,16 @@
 /**
  * Built-in centre logos as small SVG data URLs. They are simple generic
- * glyphs (not official brand artwork); users can upload their own logo.
+ * glyphs; the TikTok, X, Telegram, Snapchat and Spotify tiles use the
+ * official marks from simple-icons. Users can upload their own logo.
  */
 const svg = (inner: string, bg: string) =>
   `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="14" fill="${bg}"/>${inner}</svg>`;
+
+import { BRAND_MARKS } from "./brand-icons";
+
+/** Official mark (24×24 path) centred on a brand-coloured tile. */
+const mark = (path: string, bg: string, fg = "#fff") =>
+  svg(`<path fill="${fg}" transform="translate(14 14) scale(1.5)" d="${path}"/>`, bg);
 
 const W = 'fill="none" stroke="#fff" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"';
 
@@ -16,6 +23,11 @@ const RAW: Record<string, { label: string; svg: string }> = {
   facebook: { label: "f (blue)", svg: svg(`<path fill="#fff" d="M35 52V35h6l1-7h-7v-4c0-2 .7-3.5 3.6-3.5H42v-6.2c-.7-.1-3-.3-5.6-.3-5.6 0-9.4 3.4-9.4 9.6V28h-6v7h6v17z"/>`, "#2563eb") },
   youtube: { label: "Play (red)", svg: svg(`<rect x="12" y="19" width="40" height="27" rx="8" fill="#fff"/><path fill="#dc2626" d="M28 26l11 6.5L28 39z"/>`, "#dc2626") },
   linkedin: { label: "in (blue)", svg: svg(`<rect x="17" y="27" width="6" height="19" fill="#fff"/><circle cx="20" cy="19.5" r="3.6" fill="#fff"/><path fill="#fff" d="M28 27h6v3c1-2 3.5-3.6 7-3.6 5.4 0 7 3.5 7 8.5V46h-6v-9.5c0-2.6-.6-4.6-3.2-4.6-2.7 0-4.8 1.8-4.8 5V46h-6z"/>`, "#0a66c2") },
+  tiktok: { label: "TikTok", svg: mark(BRAND_MARKS.tiktok.path, "#000000") },
+  x: { label: "X", svg: mark(BRAND_MARKS.x.path, "#000000") },
+  telegram: { label: "Telegram", svg: mark(BRAND_MARKS.telegram.path, "#26A5E4") },
+  snapchat: { label: "Snapchat", svg: mark(BRAND_MARKS.snapchat.path, "#FFFC00", "#000000") },
+  spotify: { label: "Spotify", svg: mark(BRAND_MARKS.spotify.path, "#000000", "#1ED760") },
   wifi: { label: "Wi-Fi", svg: svg(`<path ${W} d="M14 27a26 26 0 0 1 36 0M20 34a17 17 0 0 1 24 0M26 41a8 8 0 0 1 12 0"/><circle cx="32" cy="47" r="3" fill="#fff"/>`, "#0284c7") },
   mail: { label: "Email", svg: svg(`<rect x="14" y="19" width="36" height="26" rx="4" ${W}/><path ${W} d="M15 21l17 13 17-13"/>`, "#7c3aed") },
   phone: { label: "Phone", svg: svg(`<path fill="#fff" d="M24 15c2-1 4-.5 5 1.5l3 6c.8 1.6.3 3.4-1 4.5l-2.5 2a24 24 0 0 0 7.5 7.5l2-2.5c1.1-1.3 2.9-1.8 4.5-1l6 3c2 1 2.5 3 1.5 5l-2 3.5c-1.5 2.6-4.6 3.7-7.4 2.6A40 40 0 0 1 18.9 25.4c-1.1-2.8 0-5.9 2.6-7.4z"/>`, "#16a34a") },

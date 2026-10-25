@@ -133,6 +133,8 @@ const A11Y = `(() => {
   }
   for (const el of document.querySelectorAll("button, a[href]")) {
     if (el.offsetParent === null) continue;
+    // Content of a closed <details> isn't rendered (innerText is empty) but keeps an offsetParent in Chrome.
+    if (el.closest("details:not([open])") && !el.closest("summary")) continue;
     const forLabel = el.id && document.querySelector('label[for="' + CSS.escape(el.id) + '"]');
     if (!(el.innerText || "").trim() && !name(el) && !forLabel && !el.querySelector("img[alt]:not([alt=''])")) bad.push(el.outerHTML.slice(0, 80));
   }

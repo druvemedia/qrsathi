@@ -2,8 +2,8 @@
 import { useState } from "react";
 import { Ban, CheckCircle2, KeyRound, LogOut, MoreHorizontal, Trash2 } from "lucide-react";
 import { toast } from "sonner";
-import { Alert, Badge, Button, ConfirmDialog, Field, FilterBar, Input, Modal, SearchInput, Section, Select } from "@/components/ui";
-import { DataTable, Pagination, fmtDate, fmtDateTime, fmtNum, useAdminApi, useAdminData, useListQuery, type Column, type Paged } from "@/components/admin/data";
+import { Alert, Badge, Button, ConfirmDialog, Field, Input, Modal, SearchInput, Select } from "@/components/ui";
+import { DataTable, Pagination, TableView, fmtDate, fmtDateTime, fmtNum, useAdminApi, useAdminData, useListQuery, type Column, type Paged } from "@/components/admin/data";
 import { ROLE_LABELS } from "@/lib/roles";
 
 interface Row {
@@ -41,13 +41,16 @@ export function UsersView({ actor }: { actor: Actor }) {
   const columns: Column<Row>[] = [
     {
       key: "email", label: "User", sortable: true, render: (u) => (
-        <div className="min-w-0 max-w-[260px]">
+        <div className="flex min-w-0 max-w-[300px] items-center gap-3">
+          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-slate-100 text-xs font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-300" aria-hidden>{(u.name || u.email).slice(0, 2).toUpperCase()}</span>
+          <div className="min-w-0">
           <p className="truncate font-medium">{u.name || "—"}</p>
           <p className="truncate text-xs text-slate-500">{u.email}</p>
           <div className="mt-1 flex flex-wrap gap-1">
             {u.google && <Badge tone="blue">Google</Badge>}
             {!u.hasPassword && <Badge>No password</Badge>}
             {u.mfaEnabled && <Badge tone="green">2FA</Badge>}
+          </div>
           </div>
         </div>
       ),
@@ -62,36 +65,35 @@ export function UsersView({ actor }: { actor: Actor }) {
   ];
 
   return (
-    <Section title="All accounts" description={data ? `${fmtNum(data.total)} matching` : undefined}>
-      <FilterBar
-        actions={selected.size > 0 && (
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-xs text-slate-500">{selected.size} selected</span>
-            <Button size="sm" variant="outline" onClick={() => setBulk("suspend")}><Ban className="h-3.5 w-3.5" /> Suspend</Button>
-            <Button size="sm" variant="outline" onClick={() => setBulk("reactivate")}><CheckCircle2 className="h-3.5 w-3.5" /> Reactivate</Button>
-            <Button size="sm" variant="outline" onClick={() => setBulk("revoke_sessions")}><LogOut className="h-3.5 w-3.5" /> Sign out</Button>
-            <Button size="sm" variant="ghost" onClick={() => setSelected(new Set())}>Clear</Button>
-          </div>
-        )}>
-        <SearchInput value={list.state.q} onChange={list.setQ} placeholder="Search email or name" aria-label="Search users" className="w-full sm:w-64" />
-        <Select aria-label="Filter by status" value={list.state.filters.status || ""} onChange={(e) => list.setFilter("status", e.target.value)} className="w-auto">
+    <>
+    <TableView title="All accounts" count={data ? `${fmtNum(data.total)} matching` : undefined}
+      toolbar={<>
+        <SearchInput value={list.state.q} onChange={list.setQ} placeholder="Search email or name" aria-label="Search users" className="sm:w-64" />
+        <Select aria-label="Filter by status" value={list.state.filters.status || ""} onChange={(e) => list.setFilter("status", e.target.value)} className="sm:w-auto">
           <option value="">All statuses</option><option value="active">Active</option><option value="suspended">Suspended</option>
         </Select>
-        <Select aria-label="Filter by role" value={list.state.filters.role || ""} onChange={(e) => list.setFilter("role", e.target.value)} className="w-auto">
+        <Select aria-label="Filter by role" value={list.state.filters.role || ""} onChange={(e) => list.setFilter("role", e.target.value)} className="sm:w-auto">
           <option value="">All roles</option><option value="user">User</option><option value="admin">Admin</option><option value="super_admin">Super admin</option>
         </Select>
-        <Select aria-label="Filter by plan" value={list.state.filters.plan || ""} onChange={(e) => list.setFilter("plan", e.target.value)} className="w-auto">
+        <Select aria-label="Filter by plan" value={list.state.filters.plan || ""} onChange={(e) => list.setFilter("plan", e.target.value)} className="sm:w-auto">
           <option value="">All plans</option><option value="free">Free</option><option value="pro">Pro</option><option value="business">Business</option>
         </Select>
-      </FilterBar>
-
-      <div className="mt-4">
-        <DataTable caption="Users" columns={columns} data={data?.items} loading={loading} error={error} onRetry={reload}
-          sort={list.state.sort} order={list.state.order} onSort={list.toggleSort}
-          selectable selected={selected} onSelect={setSelected}
-          empty={{ title: "No users match", body: "Try a different search or clear the filters." }} />
-        {data && <Pagination page={data.page} pages={data.pages} total={data.total} pageSize={data.pageSize} onPage={list.setPage} onPageSize={list.setPageSize} />}
-      </div>
+      </>}
+      bulk={selected.size > 0 && (
+        <>
+          <span className="px-1 text-sm font-medium">{selected.size} selected</span>
+          <Button size="sm" variant="ghost" className="text-current hover:bg-white/10 dark:hover:bg-slate-900/10" onClick={() => setBulk("suspend")}><Ban className="h-3.5 w-3.5" /> Suspend</Button>
+          <Button size="sm" variant="ghost" className="text-current hover:bg-white/10 dark:hover:bg-slate-900/10" onClick={() => setBulk("reactivate")}><CheckCircle2 className="h-3.5 w-3.5" /> Reactivate</Button>
+          <Button size="sm" variant="ghost" className="text-current hover:bg-white/10 dark:hover:bg-slate-900/10" onClick={() => setBulk("revoke_sessions")}><LogOut className="h-3.5 w-3.5" /> Sign out</Button>
+        </>
+      )}
+      onClearBulk={() => setSelected(new Set())}
+      footer={data && data.total > 0 && <Pagination page={data.page} pages={data.pages} total={data.total} pageSize={data.pageSize} onPage={list.setPage} onPageSize={list.setPageSize} />}>
+      <DataTable caption="Users" columns={columns} data={data?.items} loading={loading} error={error} onRetry={reload}
+        sort={list.state.sort} order={list.state.order} onSort={list.toggleSort}
+        selectable selected={selected} onSelect={setSelected}
+        empty={{ title: "No users match", body: "Try a different search or clear the filters." }} />
+    </TableView>
 
       <ConfirmDialog open={!!bulk} onClose={() => setBulk(null)} onConfirm={runBulk} tone={bulk === "reactivate" ? "primary" : "danger"}
         title={`${bulk ? BULK_LABEL[bulk] : ""}: ${selected.size} account${selected.size === 1 ? "" : "s"}?`} confirmLabel={bulk ? BULK_LABEL[bulk] : "Confirm"}>
@@ -102,7 +104,7 @@ export function UsersView({ actor }: { actor: Actor }) {
       </ConfirmDialog>
 
       {open && <UserDialog row={open} actor={actor} onClose={() => setOpen(null)} onChanged={() => { reload(); }} />}
-    </Section>
+    </>
   );
 }
 

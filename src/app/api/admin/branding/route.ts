@@ -4,7 +4,7 @@ import { ApiError, clientIp, handle, json, readJson } from "@/lib/api";
 import { requireAdmin } from "@/lib/session";
 import { rateLimit } from "@/lib/rate-limit";
 import { audit } from "@/lib/audit";
-import { ASSET_KINDS, BRAND_DEFAULTS, brandingSchema, type Branding } from "@/lib/branding";
+import { ASSET_KINDS, BRAND_DEFAULTS, brandingSchema, sameValue, type Branding } from "@/lib/branding";
 import { BRANDING_DRAFT, BRANDING_PUBLISHED, brandingState, writeSetting } from "@/lib/settings";
 import { ASSET_RULES } from "@/lib/image-check";
 
@@ -57,7 +57,7 @@ export const POST = handle(async (req) => {
   await assertAssetsExist(draft);
   await writeSetting(BRANDING_PUBLISHED, JSON.stringify(draft));
   await writeSetting(BRANDING_DRAFT, null);
-  const changed = (Object.keys(draft) as (keyof Branding)[]).filter((k) => draft[k] !== published[k]);
+  const changed = (Object.keys(draft) as (keyof Branding)[]).filter((k) => !sameValue(draft[k], published[k]));
   await audit("admin.branding.published", { actor: admin, targetType: "branding", ip: clientIp(req), details: { changed } });
   for (const k of ASSET_KINDS) if (changed.includes(k)) await audit(`admin.branding.${k}_replaced`, { actor: admin, targetType: "brand_asset", targetId: draft[k] ?? "removed", ip: clientIp(req) });
   await cleanupAssets(draft, published);

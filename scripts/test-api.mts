@@ -182,6 +182,31 @@ try {
     const r2 = await fetch(BASE + page, { headers: { Cookie: A.cookie } });
     check(`signed-in GET ${page} → 200`, r2.status === 200, r2.status);
   }
+
+  // ---------- contact form ----------
+  console.log("\n# Contact form");
+  {
+    const ip = `10.77.${Math.floor(Math.random() * 250)}.${Math.floor(Math.random() * 250)}`;
+    const msg = { name: "Asha Rao", email: "asha@example.com", topic: "product", message: "Hello, I have a question about labels." };
+    // The limit counts every request, so validation checks and the delivery/limit checks use separate IPs.
+    const ip2 = ip.replace(/\.\d+$/, (m) => "." + ((Number(m.slice(1)) + 1) % 250));
+    const post = (body: unknown, from = ip) => call("POST", "/api/contact", body, undefined, { "X-Forwarded-For": from });
+    check("contact: invalid e-mail rejected (400)", (await post({ ...msg, email: "not-an-email" })).status === 400);
+    check("contact: too-short message rejected (400)", (await post({ ...msg, message: "hi" })).status === 400);
+    check("contact: header-injection attempt in name rejected (400)", (await post({ ...msg, name: "Asha\r\nBcc: x@evil.example" })).status === 400);
+    check("contact: unknown topic rejected (400)", (await post({ ...msg, topic: "sales" })).status === 400);
+    const hp = await post({ ...msg, website: "http://spam.example" });
+    check("contact: honeypot submissions get a quiet 200 and aren't sent", hp.status === 200 && hp.data?.ok === true, hp);
+    const real = await post(msg, ip2);
+    check("contact: without SMTP the server says so (503), never a fake success", real.status === 503 && /isn't available/.test(real.data?.error || ""), real);
+    const xs = await call("POST", "/api/contact", msg, undefined, { Origin: "https://evil.example", "X-Forwarded-For": ip });
+    check("contact: cross-site POST blocked (403)", xs.status === 403, xs.status);
+    let last = 0;
+    for (let i = 0; i < 5; i++) last = (await post(msg, ip2)).status;
+    check("contact: rate-limited per IP (429 after 5 requests per hour)", last === 429, last);
+    const page = await (await fetch(BASE + "/contact")).text();
+    check("contact page hides the form when messages can't be delivered", !page.includes("Send message"));
+  }
 } finally {
   // ---------- cleanup ----------
   for (const u of [A, B]) if (u.cookie) await call("DELETE", "/api/account", { confirm: u.email }, u.cookie);

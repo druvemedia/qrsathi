@@ -1,6 +1,6 @@
 "use client";
 import { useMemo, useRef, useState } from "react";
-import { ChevronDown, ImagePlus, Trash2 } from "lucide-react";
+import { ChevronDown, Frame, ImagePlus, LayoutTemplate, Palette, Shapes, SlidersHorizontal, Sparkles, Trash2, Type } from "lucide-react";
 import { toast } from "sonner";
 import { mergeDesign, renderQr, type QrDesign } from "@/lib/qr-render";
 import { TEMPLATES } from "@/lib/templates";
@@ -11,18 +11,37 @@ import { cn } from "@/lib/utils";
 
 const CAPTIONS = ["SCAN ME", "PAY HERE", "SCAN & PAY", "FOLLOW US", "VIEW MENU", "FREE WI-FI", "REVIEW US", "GET OFFER"];
 
+const SECTION_ICONS: Record<string, React.ElementType> = {
+  Templates: LayoutTemplate, Colours: Palette, Shapes, Logo: Sparkles, "Frame & caption": Frame, "Text above / below": Type, "Background pattern": Shapes, Advanced: SlidersHorizontal,
+};
+
 function Section({ title, children, defaultOpen = false }: { title: string; children: React.ReactNode; defaultOpen?: boolean }) {
   const [open, setOpen] = useState(defaultOpen);
+  const Icon = SECTION_ICONS[title] ?? Palette;
   return (
     <div className="border-b border-slate-100 last:border-0 dark:border-slate-800">
-      <button type="button" onClick={() => setOpen((o) => !o)} className="flex w-full items-center justify-between py-3.5 text-left text-sm font-semibold" aria-expanded={open}>
-        {title}
-        <ChevronDown className={cn("h-4 w-4 text-slate-400 transition", open && "rotate-180")} />
+      <button type="button" onClick={() => setOpen((o) => !o)} className="group flex w-full items-center gap-3 py-3.5 text-left text-sm font-semibold" aria-expanded={open}>
+        <span className={cn("grid h-7 w-7 place-items-center rounded-lg transition-colors", open ? "bg-brand/10 text-brand" : "bg-slate-100 text-slate-500 group-hover:text-slate-800 dark:bg-slate-800 dark:text-slate-400 dark:group-hover:text-slate-100")}>
+          <Icon className="h-3.5 w-3.5" aria-hidden />
+        </span>
+        <span className="flex-1">{title}</span>
+        <ChevronDown className={cn("h-4 w-4 text-slate-400 transition-transform duration-200", open && "rotate-180")} aria-hidden />
       </button>
-      {open && <div className="space-y-4 pb-5">{children}</div>}
+      {open && <div className="animate-fade-up space-y-4 pb-5 pl-10">{children}</div>}
     </div>
   );
 }
+
+/** Dark-on-light pairs only: inverted codes don't scan on many phones. */
+const PALETTES: { name: string; fg: string; bg: string }[] = [
+  { name: "Ink", fg: "#111111", bg: "#ffffff" },
+  { name: "Indigo", fg: "#3730a3", bg: "#eef2ff" },
+  { name: "Forest", fg: "#14532d", bg: "#f0fdf4" },
+  { name: "Ocean", fg: "#0c4a6e", bg: "#f0f9ff" },
+  { name: "Plum", fg: "#581c87", bg: "#faf5ff" },
+  { name: "Rust", fg: "#7c2d12", bg: "#fff7ed" },
+  { name: "Rose", fg: "#881337", bg: "#fff1f2" },
+];
 
 function Mini({ design, active, onClick, label }: { design: Partial<QrDesign>; active: boolean; onClick: () => void; label: string }) {
   const svg = useMemo(() => {
@@ -77,6 +96,17 @@ export function DesignPanel({ design, onChange, compact = false }: { design: QrD
       </Section>
 
       <Section title="Colours" defaultOpen={!compact}>
+        <div className="flex flex-wrap gap-2" role="group" aria-label="Colour palettes">
+          {PALETTES.map((p) => {
+            const on = !design.gradient.enabled && design.fg.toLowerCase() === p.fg && design.bg.toLowerCase() === p.bg;
+            return (
+              <button key={p.name} type="button" title={p.name} aria-label={`${p.name} palette`} aria-pressed={on}
+                onClick={() => onChange({ ...design, fg: p.fg, bg: p.bg, transparent: false, gradient: { ...design.gradient, enabled: false } })}
+                className={cn("relative h-9 w-9 overflow-hidden rounded-full ring-1 ring-black/10 transition hover:scale-110 dark:ring-white/15", on && "ring-2 ring-brand ring-offset-2 ring-offset-white dark:ring-offset-slate-900")}
+                style={{ background: `linear-gradient(135deg, ${p.bg} 50%, ${p.fg} 50%)` }} />
+            );
+          })}
+        </div>
         <div className="grid grid-cols-2 gap-3">
           {!design.gradient.enabled && <ColorInput label="Modules" value={design.fg} onChange={(v) => set("fg", v)} />}
           <ColorInput label="Background" value={design.bg} onChange={(v) => set("bg", v)} />

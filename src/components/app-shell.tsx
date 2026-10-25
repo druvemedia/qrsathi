@@ -6,7 +6,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ChevronDown, Menu, PanelLeftClose, PanelLeftOpen, Search, X } from "lucide-react";
+import { ChevronDown, Menu, PanelLeftClose, PanelLeftOpen, Plus, Search, X } from "lucide-react";
 import { BrandMark, LogoMark } from "./brand";
 import { ThemeToggle, UserMenu } from "./user-menu";
 import { useApp } from "./providers";
@@ -62,10 +62,10 @@ function NavLinks({ collapsed = false, onNavigate }: { collapsed?: boolean; onNa
                           aria-current={active ? "page" : undefined}
                           aria-label={collapsed ? i.label : undefined}
                           className={cn(
-                            "group flex items-center gap-2.5 rounded-lg text-sm transition-colors",
-                            collapsed ? "h-9 w-9 justify-center" : "px-2.5 py-1.5",
+                            "group relative flex items-center gap-2.5 rounded-xl text-sm transition-colors duration-150",
+                            collapsed ? "h-9 w-9 justify-center" : "px-2.5 py-[7px]",
                             active
-                              ? "bg-white font-medium text-slate-900 shadow-card ring-1 ring-slate-200 dark:bg-slate-800 dark:text-white dark:ring-slate-700"
+                              ? "bg-white font-medium text-slate-900 shadow-card ring-1 ring-slate-200/80 before:absolute before:-left-3 before:top-1/2 before:h-4 before:w-[3px] before:-translate-y-1/2 before:rounded-r-full before:bg-brand dark:bg-slate-800/80 dark:text-white dark:ring-slate-700"
                               : "text-slate-600 hover:bg-slate-200/50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/60 dark:hover:text-white",
                           )}
                         >
@@ -106,12 +106,25 @@ function GuestCard() {
   );
 }
 
+function CreateButton({ collapsed, onNavigate }: { collapsed?: boolean; onNavigate?: () => void }) {
+  return (
+    <Tooltip label="Create QR code" disabled={!collapsed}>
+      <Link href="/generator" onClick={onNavigate} aria-label={collapsed ? "Create QR code" : undefined}
+        className={cn("mb-5 flex items-center justify-center gap-2 rounded-xl bg-slate-900 text-sm font-medium text-white shadow-sm transition hover:bg-slate-800 active:scale-[.98] dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100",
+          collapsed ? "h-9 w-9" : "h-10 w-full")}>
+        <Plus className="h-4 w-4" aria-hidden />{!collapsed && "Create QR code"}
+      </Link>
+    </Tooltip>
+  );
+}
+
 /** Desktop sidebar, collapsible to an icon rail (state remembered on this device). */
 function AppSidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => void }) {
   return (
     <aside className={cn("sticky top-0 hidden h-screen shrink-0 flex-col border-r border-slate-200 bg-slate-50/80 transition-[width] duration-200 dark:border-slate-800 dark:bg-slate-950 lg:flex", collapsed ? "w-[68px]" : "w-60")}>
       <div className={cn("flex h-14 items-center", collapsed ? "justify-center" : "px-4")}><SidebarBrand collapsed={collapsed} /></div>
       <div className={cn("flex-1 overflow-y-auto pb-4 pt-2 scrollbar-thin", collapsed ? "px-3.5" : "px-3")}>
+        <CreateButton collapsed={collapsed} />
         <NavLinks collapsed={collapsed} />
       </div>
       <div className={cn("space-y-3 border-t border-slate-200 p-3 dark:border-slate-800", collapsed && "flex justify-center")}>
@@ -147,7 +160,7 @@ function MobileNavigation({ open, onClose }: { open: boolean; onClose: () => voi
           <SidebarBrand collapsed={false} />
           <button className="rounded-lg p-2 hover:bg-slate-200/60 dark:hover:bg-slate-800" onClick={onClose} aria-label="Close menu"><X className="h-5 w-5" /></button>
         </div>
-        <div className="flex-1 overflow-y-auto p-3"><NavLinks onNavigate={onClose} /></div>
+        <div className="flex-1 overflow-y-auto p-3"><CreateButton onNavigate={onClose} /><NavLinks onNavigate={onClose} /></div>
         <div className="border-t border-slate-200 p-3 dark:border-slate-800"><GuestCard /></div>
       </div>
     </div>
@@ -189,7 +202,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <MobileNavigation open={mobileOpen} onClose={closeMobile} />
       <div className="flex min-w-0 flex-1 flex-col">
         {settings.announcement && <div className="bg-brand px-4 py-1.5 text-center text-xs font-medium text-white">{settings.announcement}</div>}
-        <header className="sticky top-0 z-40 flex h-14 items-center gap-2 border-b border-slate-200 bg-white/85 px-3 backdrop-blur-xl dark:border-slate-800 dark:bg-slate-950/85 sm:px-5">
+        <header className="sticky top-0 z-40 flex h-14 items-center gap-2 border-b border-slate-200/70 bg-slate-50/80 px-3 backdrop-blur-xl dark:border-slate-800/80 dark:bg-slate-950/80 sm:px-5">
           <button className="rounded-lg p-2 hover:bg-slate-100 dark:hover:bg-slate-800 lg:hidden" onClick={() => setMobileOpen(true)} aria-label="Open menu" aria-expanded={mobileOpen}>
             <Menu className="h-5 w-5" />
           </button>
@@ -206,7 +219,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <UserMenu />
           </div>
         </header>
-        <main id="main" className="min-w-0 flex-1 px-4 py-6 sm:px-6 lg:px-8">
+        <main id="main" className="min-w-0 flex-1 px-4 py-6 sm:px-6 lg:px-10 lg:py-8">
           <div key={pathname} className="mx-auto max-w-7xl animate-page-in">{children}</div>
         </main>
       </div>

@@ -3,7 +3,7 @@ import { useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { Flag } from "lucide-react";
 import { api } from "@/lib/fetcher";
-import { Alert, Button, Card, Field, Input, Select, Textarea } from "@/components/ui";
+import { Alert, Button, Field, Input, Select, Textarea } from "@/components/ui";
 
 export function ReportForm() {
   const sp = useSearchParams();
@@ -26,7 +26,7 @@ export function ReportForm() {
   };
   if (done) return <Alert tone="success" title="Thank you — report received">Our team will review it. If the QR code breaks our rules it will be disabled.</Alert>;
   return (
-    <Card className="p-6">
+    <div>
       <form onSubmit={submit} className="space-y-4">
         {error && <Alert tone="error">{error}</Alert>}
         <Field label="QR link or short code" hint="The address the QR opened, e.g. https://…/r/abc1234"><Input required value={f.url} onChange={(e) => setF({ ...f, url: e.target.value })} maxLength={2000} /></Field>
@@ -45,6 +45,6 @@ export function ReportForm() {
         <Field label="Your email (optional)" hint="Only used if we need more information."><Input type="email" value={f.email} onChange={(e) => setF({ ...f, email: e.target.value })} /></Field>
         <Button type="submit" loading={busy}><Flag className="h-4 w-4" /> Submit report</Button>
       </form>
-    </Card>
+    </div>
   );
 }

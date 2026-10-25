@@ -3,7 +3,7 @@
 //   QRSathi_Mini_Project_Report.docx (docx-js; TOC/LOF/LOT are Word fields — update on open)
 //   QRSathi_Requirement_Traceability_Matrix.xlsx (ExcelJS)
 //   standalone Markdown documents from ../source/standalone/*.md
-// Usage: npm install && npm run diagrams && npm run build
+// Usage (in docs/mini-project-report/report-tools): npm install && npm run diagrams && npm run build
 import fs from "node:fs";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
@@ -24,7 +24,7 @@ import { DEFECTS, DEFECT_COLUMNS } from "./data/defects.mjs";
 const R = path.resolve(import.meta.dirname, "..");          // docs/mini-project-report
 const ROOT = path.resolve(R, "../..");                        // repository root
 const SRC = path.join(R, "source");
-const TMP = path.join(R, "build", ".tmp");
+const TMP = path.join(R, "report-tools", ".tmp");
 fs.mkdirSync(TMP, { recursive: true });
 
 export const META = {
@@ -63,7 +63,7 @@ function apiRoutes() {
     if (/getUser\(/.test(src) && !g.includes("user")) g.push("optional user");
     if (/requireFeature\(/.test(src)) g.push("plan feature");
     if (/verifyWebhookSignature|handleRazorpayWebhook/.test(src)) g.push("HMAC signature");
-    if (/rateLimit\(/.test(src)) g.push("rate-limited");
+    if (/rateLimit\(/.test(src) || /verifyCredentials\(/.test(src)) g.push("rate-limited");
     const guard = [...new Set(g)].join(", ") || "public";
     return { route, file: path.relative(ROOT, file).replace(/\\/g, "/"), methods, guard, purpose: API_PURPOSE[route] || "" };
   }).sort((a, b) => a.route.localeCompare(b.route));
@@ -582,7 +582,7 @@ async function main() {
     counts: { headings: entries.headings.length, figures: entries.figures.length, tables: entries.tables.length, testcases: TESTCASES.length, requirements: RTM.length, apiRoutes: g._api.length },
     standalone: written,
   };
-  fs.writeFileSync(path.join(R, "build", "build-report.json"), JSON.stringify(report, null, 2));
+  fs.writeFileSync(path.join(R, "report-tools", "build-report.json"), JSON.stringify(report, null, 2));
   console.log(JSON.stringify(report, null, 2));
 }
 

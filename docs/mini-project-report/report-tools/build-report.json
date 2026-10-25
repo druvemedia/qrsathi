@@ -1,10 +1,10 @@
 {
-  "built": "2026-10-25T13:46:54.085Z",
+  "built": "2026-10-25T14:27:15.368Z",
   "pdf": {
-    "pages": 157,
+    "pages": 156,
     "nCover": 2,
     "nFront": 16,
-    "nBody": 139,
+    "nBody": 138,
     "located": 307
   },
   "docx": {
@@ -28,7 +28,7 @@
       true,
       true
     ],
-    "characters": 254938
+    "characters": 254865
   },
   "counts": {
     "headings": 178,

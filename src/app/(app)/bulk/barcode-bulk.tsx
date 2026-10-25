@@ -134,13 +134,13 @@ export function BarcodeBulk() {
       <div className="grid gap-6 lg:grid-cols-3">
         <Card className="p-5 lg:col-span-2">
           <p className="text-xs font-semibold uppercase tracking-wide text-brand">Step 1</p>
-          <h2 className="mb-3 font-display text-lg font-bold">Barcode format</h2>
+          <h2 className="mb-3 font-serif text-lg font-medium">Barcode format</h2>
           <FormatPicker value={format} onChange={setFormat} />
           <GtinNotice formatId={format} className="mt-4" />
         </Card>
         <Card className="p-5">
           <p className="text-xs font-semibold uppercase tracking-wide text-brand">Step 2</p>
-          <h2 className="font-display text-lg font-bold">Upload CSV or Excel</h2>
+          <h2 className="font-serif text-lg font-medium">Upload CSV or Excel</h2>
           <div className="mt-3 flex flex-col items-center gap-2 rounded-xl border-2 border-dashed border-slate-200 p-5 text-center dark:border-slate-800"
             onDragOver={(e) => e.preventDefault()} onDrop={(e) => { e.preventDefault(); const file = e.dataTransfer.files[0]; if (file) pick(file); }}>
             <FileSpreadsheet className="h-9 w-9 text-slate-300" />
@@ -158,7 +158,7 @@ export function BarcodeBulk() {
       {headers.length > 0 && (
         <Card className="p-5">
           <p className="text-xs font-semibold uppercase tracking-wide text-brand">Step 3</p>
-          <h2 className="mb-4 font-display text-lg font-bold">Map columns & style</h2>
+          <h2 className="mb-4 font-serif text-lg font-medium">Map columns & style</h2>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
             {([["value", `${f.label} data *`], ["filename", "File name"], ["name", "Label title"], ["price", "Label price"], ["sku", "Label SKU"]] as const).map(([k, lbl]) => (
               <Field key={k} label={lbl}>
@@ -193,7 +193,7 @@ export function BarcodeBulk() {
           <div className="flex flex-col gap-4 p-5 lg:flex-row lg:items-center lg:justify-between">
             <div>
               <p className="text-xs font-semibold uppercase tracking-wide text-brand">Step 4</p>
-              <h2 className="font-display text-lg font-bold">Validate & generate</h2>
+              <h2 className="font-serif text-lg font-medium">Validate & generate</h2>
               <div className="mt-2 flex flex-wrap gap-2">
                 <Badge tone="green"><CheckCircle2 className="h-3 w-3" /> {good.length} valid</Badge>
                 {bad.length > 0 && <Badge tone="rose"><XCircle className="h-3 w-3" /> {bad.length} invalid</Badge>}

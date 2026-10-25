@@ -6,7 +6,8 @@ import { Menu, X } from "lucide-react";
 import { Logo } from "./brand";
 import { ThemeToggle, UserMenu } from "./user-menu";
 import { useApp } from "./providers";
-import { footerLine } from "@/lib/branding";
+import { footerLine, socialLinks } from "@/lib/branding";
+import { BrandIcon } from "./brand-icon";
 import { cn } from "@/lib/utils";
 
 const NAV = [
@@ -89,6 +90,7 @@ const COLS: { title: string; links: [string, string][] }[] = [
 export function SiteFooter() {
   const { settings } = useApp();
   const b = settings.branding;
+  const social = socialLinks(b);
   return (
     <footer className="border-t border-zinc-200 dark:border-zinc-800">
       <div className="mx-auto grid max-w-6xl gap-10 px-4 py-14 sm:px-6 md:grid-cols-[1.4fr_repeat(4,1fr)]">
@@ -99,6 +101,18 @@ export function SiteFooter() {
             <ul className="mt-4 space-y-1 text-sm text-zinc-600 dark:text-zinc-400">
               {b.supportEmail && <li><a href={`mailto:${b.supportEmail}`} className="hover:text-zinc-950 dark:hover:text-white">{b.supportEmail}</a></li>}
               {b.contactPhone && <li><a href={`tel:${b.contactPhone.replace(/[^\d+]/g, "")}`} className="hover:text-zinc-950 dark:hover:text-white">{b.contactPhone}</a></li>}
+            </ul>
+          )}
+          {social.length > 0 && (
+            <ul className="mt-5 flex flex-wrap gap-2" aria-label={`${b.brandName} on social media`}>
+              {social.map((l) => (
+                <li key={l.id}>
+                  <a href={l.url} target="_blank" rel="noopener noreferrer" aria-label={`${b.brandName} on ${l.label} (opens in a new tab)`}
+                    className="grid h-9 w-9 place-items-center rounded-full border border-zinc-200 text-zinc-600 transition hover:-translate-y-0.5 hover:border-zinc-300 hover:text-zinc-950 dark:border-zinc-800 dark:text-zinc-400 dark:hover:border-zinc-700 dark:hover:text-white">
+                    <BrandIcon brand={l.id} mono className="h-4 w-4" />
+                  </a>
+                </li>
+              ))}
             </ul>
           )}
         </div>

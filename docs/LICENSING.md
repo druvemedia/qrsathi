@@ -47,6 +47,7 @@ Either way, register or protect the **QRSathi** name and logo separately. Open-s
 | BSD-3-Clause / BSD-2-Clause / 0BSD / MIT-0 | 8 |
 | MIT AND Zlib (pako) | 2 |
 | Dual: MIT OR GPL-3.0 (jszip), MPL-2.0 OR Apache-2.0 (dompurify), MIT OR CC0 | used under the permissive option |
+| CC0-1.0 (`simple-icons`: social brand marks, see below) | 1 |
 | CC-BY-4.0 (caniuse-lite: browser-support data used at build time) | 1 |
 | LGPL-3.0-or-later (`@img/sharp-*` → libvips, optional dependency of Next.js image optimisation) | Dynamically loaded native library. LGPL allows use in commercial/proprietary apps; keep its licence notice. |
 
@@ -59,6 +60,10 @@ All of these allow commercial use. None forces QRSathi's own code to be released
 | `public/zxing/zxing_reader.wasm` | Copied at install time from `zxing-wasm` (ZXing-C++) | MIT (wrapper) / Apache-2.0 (ZXing-C++) |
 | Inter font | `next/font/google`, downloaded and self-hosted at build time | SIL Open Font License 1.1 |
 | Icons | `lucide-react` | ISC |
+| Social brand marks (Instagram, Facebook, WhatsApp, YouTube, TikTok, X, Telegram, Snapchat, Spotify, Google Maps, Threads, Pinterest, GitHub) | `simple-icons` 16.35.0, imported individually in `src/lib/brand-icons.ts` | Path data CC0-1.0; the marks themselves are **trademarks** of their owners |
+| LinkedIn "in" glyph | Drawn for this project (`simple-icons` no longer ships LinkedIn) | Owned by Druve Media; LinkedIn is a trademark of LinkedIn Corporation |
 | `src/app/icon.svg`, logo mark (`src/components/brand.tsx`) | Project's own artwork | Owned by Druve Media |
 
-No third-party images, stock photos or brand logos (UPI, Google Pay, PhonePe, Paytm and so on) are bundled. Payment-app names appear only as text. Before adding any logo, check that brand's usage guidelines.
+No stock photos or payment brand logos (UPI, Google Pay, PhonePe, Paytm and so on) are bundled; payment-app names appear only as text.
+
+Social brand marks are used only to identify where a QR code or footer link leads (the type picker, social QR types, optional centre logos and the footer's configured social links). They don't imply endorsement. The CC0 licence covers the SVG path data, not trademark rights: before printing a brand's mark on marketing material, check that brand's guidelines (several ask for unmodified colours and clear space). Before adding any other logo, check its usage guidelines too.

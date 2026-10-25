@@ -2,8 +2,8 @@
 import { useState } from "react";
 import { Ban, ExternalLink, Pause, Play, Trash2 } from "lucide-react";
 import { toast } from "sonner";
-import { Badge, Button, ConfirmDialog, FilterBar, SearchInput, Section, Select } from "@/components/ui";
-import { DataTable, Pagination, fmtDate, fmtNum, useAdminApi, useAdminData, useListQuery, type Column, type Paged } from "@/components/admin/data";
+import { Badge, ConfirmDialog, SearchInput, Select } from "@/components/ui";
+import { DataTable, Pagination, RowMenu, TableView, fmtDate, fmtNum, useAdminApi, useAdminData, useListQuery, type Column, type Paged } from "@/components/admin/data";
 
 interface Row {
   id: string; name: string; type: string; shortCode: string; destination: string; isHosted: boolean; status: string; expiresAt: string | null; createdAt: string;
@@ -53,36 +53,33 @@ export function QrCodesView() {
     { key: "createdAt", label: "Created", sortable: true, hideSm: true, render: (q) => <span className="whitespace-nowrap text-xs">{fmtDate(q.createdAt)}</span> },
     {
       key: "actions", label: <span className="sr-only">Actions</span>, className: "text-right", render: (q) => (
-        <div className="flex justify-end gap-1">
-          <a href={`/${q.isHosted ? "p" : "r"}/${q.shortCode}`} target="_blank" rel="noopener noreferrer nofollow" className="grid h-8 w-8 place-items-center rounded-lg text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800" aria-label="Open public link" title="Open public link (counts as a scan)"><ExternalLink className="h-4 w-4" /></a>
-          {q.status === "active"
-            ? <Button size="icon" variant="ghost" onClick={() => setPending({ row: q, action: "paused" })} aria-label="Pause" title="Pause"><Pause className="h-4 w-4" /></Button>
-            : <Button size="icon" variant="ghost" onClick={() => setPending({ row: q, action: "active" })} aria-label="Re-enable" title="Re-enable"><Play className="h-4 w-4" /></Button>}
-          {q.status !== "disabled" && <Button size="icon" variant="ghost" onClick={() => setPending({ row: q, action: "disabled" })} aria-label="Disable for abuse" title="Disable (abuse)"><Ban className="h-4 w-4 text-rose-500" /></Button>}
-          <Button size="icon" variant="ghost" onClick={() => setPending({ row: q, action: "delete" })} aria-label="Delete" title="Delete"><Trash2 className="h-4 w-4" /></Button>
-        </div>
+        <RowMenu label={`Actions for /${q.shortCode}`} items={[
+          { label: "Open public link", icon: ExternalLink, href: `/${q.isHosted ? "p" : "r"}/${q.shortCode}`, external: true, title: "Counts as a scan" },
+          { label: "Pause", icon: Pause, onClick: () => setPending({ row: q, action: "paused" }), hidden: q.status !== "active" },
+          { label: "Re-enable", icon: Play, onClick: () => setPending({ row: q, action: "active" }), hidden: q.status === "active" },
+          { label: "Disable (abuse)", icon: Ban, onClick: () => setPending({ row: q, action: "disabled" }), hidden: q.status === "disabled", danger: true },
+          { label: "Delete", icon: Trash2, onClick: () => setPending({ row: q, action: "delete" }), danger: true },
+        ]} />
       ),
     },
   ];
 
   const verb = pending?.action === "delete" ? "Delete" : pending?.action === "disabled" ? "Disable" : pending?.action === "paused" ? "Pause" : "Re-enable";
   return (
-    <Section title="Dynamic & hosted codes" description={data ? `${fmtNum(data.total)} matching · ${fmtNum(data.staticCount)} static codes not listed` : undefined}>
-      <FilterBar>
-        <SearchInput value={list.state.q} onChange={list.setQ} placeholder="Short code, name, destination or owner" aria-label="Search QR codes" className="w-full sm:w-72" />
-        <Select aria-label="Filter by status" value={list.state.filters.status || ""} onChange={(e) => list.setFilter("status", e.target.value)} className="w-auto">
+    <TableView title="Dynamic & hosted codes" count={data ? `${fmtNum(data.total)} matching · ${fmtNum(data.staticCount)} static not listed` : undefined}
+      footer={data && data.total > 0 && <Pagination page={data.page} pages={data.pages} total={data.total} pageSize={data.pageSize} onPage={list.setPage} onPageSize={list.setPageSize} />}
+      toolbar={<>
+        <SearchInput value={list.state.q} onChange={list.setQ} placeholder="Short code, name, destination or owner" aria-label="Search QR codes" className="sm:w-72" />
+        <Select aria-label="Filter by status" value={list.state.filters.status || ""} onChange={(e) => list.setFilter("status", e.target.value)} className="sm:w-auto">
           <option value="">All statuses</option><option value="active">Active</option><option value="paused">Paused</option><option value="disabled">Disabled</option>
         </Select>
-        <Select aria-label="Filter by kind" value={list.state.filters.kind || ""} onChange={(e) => list.setFilter("kind", e.target.value)} className="w-auto">
+        <Select aria-label="Filter by kind" value={list.state.filters.kind || ""} onChange={(e) => list.setFilter("kind", e.target.value)} className="sm:w-auto">
           <option value="">Redirects & hosted</option><option value="redirect">Redirects</option><option value="hosted">Hosted pages</option>
         </Select>
-      </FilterBar>
-      <div className="mt-4">
-        <DataTable caption="QR codes" columns={columns} data={data?.items} loading={loading} error={error} onRetry={reload}
-          sort={list.state.sort} order={list.state.order} onSort={list.toggleSort}
-          empty={{ title: "No dynamic or hosted codes match" }} />
-        {data && <Pagination page={data.page} pages={data.pages} total={data.total} pageSize={data.pageSize} onPage={list.setPage} onPageSize={list.setPageSize} />}
-      </div>
+      </>}>
+      <DataTable caption="QR codes" columns={columns} data={data?.items} loading={loading} error={error} onRetry={reload}
+        sort={list.state.sort} order={list.state.order} onSort={list.toggleSort}
+        empty={{ title: "No dynamic or hosted codes match" }} />
       <ConfirmDialog open={!!pending} onClose={() => setPending(null)} onConfirm={apply} tone={pending?.action === "active" ? "primary" : "danger"}
         title={`${verb} /${pending?.row.shortCode}?`} confirmLabel={verb}>
         {pending?.action === "delete" && "The code and its scan history are deleted permanently. Printed copies will show “not found”."}
@@ -90,6 +87,6 @@ export function QrCodesView() {
         {pending?.action === "paused" && "Visitors will see a “paused” notice until it's re-enabled."}
         {pending?.action === "active" && "The code will redirect to its destination again."}
       </ConfirmDialog>
-    </Section>
+    </TableView>
   );
 }
