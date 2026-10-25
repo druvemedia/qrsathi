@@ -3,21 +3,37 @@
   "version": "1.0.0",
   "private": true,
   "description": "All-in-one smart QR code generator with UPI payments, dynamic QR, analytics and bulk generation.",
+  "engines": {
+    "node": ">=22.5.0",
+    "npm": ">=10"
+  },
   "scripts": {
     "dev": "next dev",
-    "build": "node scripts/copy-wasm.mjs && prisma generate && next build",
+    "build": "node scripts/copy-wasm.mjs && node scripts/db/prisma.mjs generate && next build",
     "start": "next start",
     "db:push": "prisma db push",
     "db:studio": "prisma studio",
     "seed:demo": "node prisma/seed-demo.mjs",
     "typecheck": "tsc --noEmit",
     "test:qr": "tsx scripts/test-qr.mts",
-    "postinstall": "prisma generate && node scripts/copy-wasm.mjs",
+    "postinstall": "node scripts/db/prisma.mjs generate && node scripts/copy-wasm.mjs",
     "predev": "node scripts/copy-wasm.mjs",
     "test:barcodes": "tsx scripts/test-barcodes.mts",
     "test:api": "tsx scripts/test-api.mts",
-    "test": "tsx scripts/test-qr.mts && tsx scripts/test-barcodes.mts",
-    "test:browser": "tsx scripts/test-browser.mts"
+    "test": "tsx scripts/test-security.mts && tsx scripts/test-qr.mts && tsx scripts/test-barcodes.mts",
+    "test:browser": "tsx scripts/test-browser.mts",
+    "admin": "tsx scripts/admin.mts",
+    "db:generate": "node scripts/db/prisma.mjs generate",
+    "db:deploy": "node scripts/db/prisma.mjs deploy",
+    "db:mysql:schema": "node scripts/db/mysql-schema.mjs",
+    "db:mysql:deploy": "prisma migrate deploy --schema prisma/mysql/schema.prisma",
+    "db:migrate-data": "tsx scripts/db/sqlite-to-mysql.mts",
+    "test:mysql": "tsx scripts/test-mysql.mts",
+    "lint": "eslint .",
+    "test:security": "tsx scripts/test-security.mts",
+    "license:check": "node scripts/license-report.mjs",
+    "test:admin": "tsx scripts/test-admin.mts",
+    "audit:check": "node scripts/audit-check.mjs"
   },
   "prisma": {
     "schema": "prisma/schema.prisma"
@@ -47,6 +63,7 @@
     "zxing-wasm": "^3.1.6"
   },
   "devDependencies": {
+    "@eslint/eslintrc": "^3.3.7",
     "@types/bcryptjs": "^2.4.6",
     "@types/node": "^22.20.5",
     "@types/nodemailer": "^8.0.2",
@@ -55,6 +72,8 @@
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "autoprefixer": "^10.6.1",
+    "eslint": "^9.39.5",
+    "eslint-config-next": "^15.5.28",
     "postcss": "^8.5.31",
     "prisma": "^6.19.3",
     "sharp": "^0.35.5",

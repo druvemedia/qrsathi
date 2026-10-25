@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { CreditCard, FileText, KeyRound, Monitor, Moon, Palette, Shield, SlidersHorizontal, Sun, Trash2, User } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "@/lib/fetcher";
+import { isAdminRole } from "@/lib/roles";
 import { formatDate, formatNumber, cn } from "@/lib/utils";
 import { QR_TYPES } from "@/lib/qr-types";
 import { TEMPLATES } from "@/lib/templates";
@@ -91,8 +92,8 @@ export function AccountSettings() {
               </a>
             </li>
           ))}
-          {user.role === "admin" && (
-            <li><Link href="/admin" className="flex items-center gap-2 whitespace-nowrap rounded-lg px-2.5 py-1.5 text-sm text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"><Shield className="h-4 w-4 text-slate-400" aria-hidden /> Admin settings</Link></li>
+          {isAdminRole(user.role) && (
+            <li><Link href="/admin/login" className="flex items-center gap-2 whitespace-nowrap rounded-lg px-2.5 py-1.5 text-sm text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"><Shield className="h-4 w-4 text-slate-400" aria-hidden /> Admin console</Link></li>
           )}
         </ul>
       </nav>
@@ -203,9 +204,9 @@ export function AccountSettings() {
         <Field label={<>Type <strong>{user.email}</strong> to confirm</>} htmlFor="del-confirm" className="mt-3"><Input id="del-confirm" value={confirm} onChange={(e) => setConfirm(e.target.value)} autoComplete="off" /></Field>
       </ConfirmDialog>
 
-      {user.role === "admin" && (
+      {isAdminRole(user.role) && (
         <Alert tone="info" icon={<Shield className="h-4 w-4" />} className="lg:col-start-2">
-          You&apos;re an administrator. Site branding, users, plans and abuse reports are managed in the <Link href="/admin" className="font-medium underline">Admin panel</Link>.
+          You&apos;re an administrator. Users, moderation, plans and site settings are managed in the separate <Link href="/admin/login" className="font-medium underline">admin console</Link>, which has its own sign-in.
         </Alert>
       )}
     </div>

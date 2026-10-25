@@ -2,9 +2,10 @@ import { z } from "zod";
 import { db } from "@/lib/db";
 import { ApiError, handle, json, readJson } from "@/lib/api";
 import { hashPassword, passwordSchema, verifyPassword } from "@/lib/auth-helpers";
-import { createSession, destroySession, publicUser, requireUser } from "@/lib/session";
+import { createSession, destroySession, publicUser, requireUser, revokeAllSessions } from "@/lib/session";
+import { audit } from "@/lib/audit";
+import { rateLimit } from "@/lib/rate-limit";
 import { getPlan } from "@/lib/plans";
-import { logEvent } from "@/lib/log";
 import { deleteStoredFile } from "@/lib/storage";
 
 export const GET = handle(async () => {
@@ -31,7 +32,8 @@ const patchSchema = z.object({
 
 export const PATCH = handle(async (req) => {
   const user = await requireUser();
-  const body = await readJson(req, patchSchema);
+  const body = await readJson(req, patchSchema, 10_000);
+  if (body.newPassword) await rateLimit(`pwchange:${user.id}`, 5, 15 * 60 * 1000);
   const data: Record<string, unknown> = {};
   if (body.name) data.name = body.name;
   if (body.newPassword) {
@@ -44,8 +46,9 @@ export const PATCH = handle(async (req) => {
   }
   const updated = await db.user.update({ where: { id: user.id }, data });
   if (body.newPassword) {
-    await createSession(updated); // keep this device signed in
-    await logEvent("info", "auth.password_changed", updated.email, updated.id);
+    await revokeAllSessions(updated.id); // every other device is signed out
+    await createSession(updated, { kind: "user" }); // keep this device signed in
+    await audit("auth.password_changed", { actor: { id: updated.id } });
   }
   return json({ user: publicUser(updated) });
 });
@@ -54,10 +57,14 @@ export const DELETE = handle(async (req) => {
   const user = await requireUser();
   const { confirm } = await readJson(req, z.object({ confirm: z.string() }));
   if (confirm.trim().toLowerCase() !== user.email) throw new ApiError(400, "Type your email address to confirm.");
+  if (user.role === "super_admin") {
+    const others = await db.user.count({ where: { role: "super_admin", status: "active", id: { not: user.id } } });
+    if (others === 0) throw new ApiError(400, "You are the last super administrator. Promote another super administrator before deleting this account.");
+  }
   const uploads = await db.upload.findMany({ where: { userId: user.id } });
   for (const u of uploads) await deleteStoredFile(u.storedName);
   await db.user.delete({ where: { id: user.id } });
-  await logEvent("info", "account.deleted", user.email);
-  await destroySession();
+  await audit("account.deleted", { actor: { id: user.id } });
+  await destroySession("user");
   return json({ ok: true });
 });

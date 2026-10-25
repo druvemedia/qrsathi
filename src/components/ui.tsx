@@ -4,7 +4,7 @@
  * sizes, colours and focus states stay consistent.
  */
 import Link from "next/link";
-import { forwardRef, useEffect, useId, useRef, useState } from "react";
+import { cloneElement, forwardRef, isValidElement, useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { AlertTriangle, Check, ChevronDown, ChevronRight, Loader2, Search, X } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -73,17 +73,27 @@ export function LinkButton({
 export function Field({
   label, hint, error, children, className, htmlFor, required,
 }: { label?: React.ReactNode; hint?: React.ReactNode; error?: string; children: React.ReactNode; className?: string; htmlFor?: string; required?: boolean }) {
+  // Associate the label (and hint/error) with a single form-control child automatically
+  // when the caller didn't pass htmlFor, so every field has an accessible name.
+  const auto = useId();
+  const child = isValidElement<{ id?: string; "aria-describedby"?: string }>(children) ? children : null;
+  const isControl = !!child && (typeof child.type !== "string" || ["input", "select", "textarea"].includes(child.type));
+  const id = htmlFor ?? (isControl ? child!.props.id ?? `f${auto}` : undefined);
+  const noteId = error || hint ? `${id ?? auto}-note` : undefined;
+  const content = isControl && (!child!.props.id || noteId)
+    ? cloneElement(child!, { id, "aria-describedby": [child!.props["aria-describedby"], noteId].filter(Boolean).join(" ") || undefined })
+    : children;
   return (
     <div className={className}>
       {label && (
-        <label htmlFor={htmlFor} className="label">
+        <label htmlFor={id} className="label">
           {label}
           {required && <span className="ml-0.5 text-rose-500" aria-hidden>*</span>}
           {required && <span className="sr-only"> (required)</span>}
         </label>
       )}
-      {children}
-      {error ? <p className="err" role="alert">{error}</p> : hint ? <p className="hint">{hint}</p> : null}
+      {content}
+      {error ? <p id={noteId} className="err" role="alert">{error}</p> : hint ? <p id={noteId} className="hint">{hint}</p> : null}
     </div>
   );
 }

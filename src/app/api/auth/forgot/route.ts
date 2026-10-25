@@ -1,33 +1,22 @@
-import { createHash, randomBytes } from "crypto";
 import { z } from "zod";
 import { db } from "@/lib/db";
-import { baseUrl, clientIp, handle, json, readJson } from "@/lib/api";
+import { clientIp, handle, json, readJson } from "@/lib/api";
 import { emailSchema } from "@/lib/auth-helpers";
-import { rateLimit } from "@/lib/rate-limit";
-import { sendMail } from "@/lib/mail";
-import { getSettings } from "@/lib/settings";
+import { rateLimit, withinLimit } from "@/lib/rate-limit";
+import { sendPasswordReset } from "@/lib/password-reset";
+import { audit } from "@/lib/audit";
 
 export const POST = handle(async (req) => {
-  rateLimit(`forgot:${clientIp(req)}`, 5, 15 * 60 * 1000);
-  const { email } = await readJson(req, z.object({ email: emailSchema }));
+  const ip = clientIp(req);
+  await rateLimit(`forgot:ip:${ip}`, 5, 15 * 60 * 1000);
+  await rateLimit("forgot:global", 200, 15 * 60 * 1000);
+  const { email } = await readJson(req, z.object({ email: emailSchema }), 10_000);
   const user = await db.user.findUnique({ where: { email } });
   // Same response whether or not the account exists (no account enumeration).
-  if (user && user.status === "active") {
-    const token = randomBytes(32).toString("base64url");
-    await db.passwordReset.create({
-      data: {
-        userId: user.id,
-        tokenHash: createHash("sha256").update(token).digest("hex"),
-        expiresAt: new Date(Date.now() + 60 * 60 * 1000),
-      },
-    });
-    const { siteName } = await getSettings();
-    const link = `${baseUrl(req)}/reset-password?token=${token}`;
-    await sendMail({
-      to: user.email,
-      subject: `Reset your ${siteName} password`,
-      text: `Hi ${user.name || ""},\n\nUse this link to set a new password (valid for 1 hour):\n${link}\n\nIf you didn't request this, you can ignore this email.`,
-    });
+  // At most 3 e-mails per account per hour (prevents mail bombing), silently.
+  if (user && user.status === "active" && (await withinLimit(`forgot:acct:${user.id}`, 3, 60 * 60 * 1000))) {
+    await sendPasswordReset(user, req);
+    await audit("auth.password_reset_requested", { actor: { id: user.id }, ip });
   }
   return json({ ok: true, message: "If an account exists for that email, a reset link has been sent." });
 });

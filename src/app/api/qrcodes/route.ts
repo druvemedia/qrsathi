@@ -1,6 +1,7 @@
 import { db } from "@/lib/db";
 import { baseUrl, handle, json, readJson } from "@/lib/api";
 import { requireUser } from "@/lib/session";
+import { rateLimit } from "@/lib/rate-limit";
 import { createQr, createSchema, serializeQr } from "@/lib/qr-service";
 import { logEvent } from "@/lib/log";
 
@@ -29,6 +30,7 @@ export const GET = handle(async (req) => {
 
 export const POST = handle(async (req) => {
   const user = await requireUser();
+  await rateLimit(`qr-create:${user.id}`, 300, 60 * 60 * 1000);
   const input = await readJson(req, createSchema);
   const qr = await createQr(user, input, baseUrl(req));
   await logEvent("info", "qr.created", `${qr.type}${qr.isDynamic ? " (dynamic)" : ""} ${qr.shortCode ?? ""}`, user.id);

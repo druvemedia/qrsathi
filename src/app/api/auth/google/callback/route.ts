@@ -2,7 +2,9 @@ import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { baseUrl } from "@/lib/api";
-import { createSession, isAdminEmail } from "@/lib/session";
+import { createSession } from "@/lib/session";
+import { safeNextPath } from "@/lib/safe-redirect";
+import { audit } from "@/lib/audit";
 import { getSettings } from "@/lib/settings";
 import { logEvent } from "@/lib/log";
 
@@ -12,7 +14,7 @@ export async function GET(req: Request) {
   const url = new URL(req.url);
   const jar = await cookies();
   const state = jar.get("g_state")?.value;
-  const next = jar.get("g_next")?.value || "/dashboard";
+  const next = safeNextPath(jar.get("g_next")?.value);
   jar.delete("g_state");
   jar.delete("g_next");
 
@@ -45,17 +47,18 @@ export async function GET(req: Request) {
       if (user.status !== "active") return fail("suspended");
       user = await db.user.update({
         where: { id: user.id },
-        data: { googleId: info.sub, lastLoginAt: new Date(), ...(isAdminEmail(email) ? { role: "admin" } : {}) },
+        data: { googleId: info.sub, lastLoginAt: new Date() },
       });
     } else {
       const settings = await getSettings();
-      if (!settings.allowSignups && !isAdminEmail(email)) return fail("signups_closed");
+      if (!settings.allowSignups) return fail("signups_closed");
       user = await db.user.create({
-        data: { email, name: info.name || email.split("@")[0], googleId: info.sub, role: isAdminEmail(email) ? "admin" : "user", lastLoginAt: new Date() },
+        data: { email, name: info.name || email.split("@")[0], googleId: info.sub, role: "user", lastLoginAt: new Date() },
       });
-      await logEvent("info", "auth.signup_google", email, user.id);
+      await audit("auth.signup", { actor: { id: user.id }, details: { method: "google" } });
     }
-    await createSession(user);
+    await createSession(user, { kind: "user" });
+    await audit("auth.login", { actor: { id: user.id }, details: { method: "google" } });
     return NextResponse.redirect(`${base}${next}`);
   } catch (e) {
     await logEvent("error", "auth.google_failed", e instanceof Error ? e.message : String(e));

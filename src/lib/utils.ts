@@ -5,6 +5,15 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+/**
+ * JSON for an inline <script type="application/ld+json">. Escapes <, > and &
+ * so admin-controlled strings (site name, tagline) can never close the tag.
+ */
+export function safeJsonLd(value: unknown) {
+  const esc: Record<string, string> = { "<": "\\u003c", ">": "\\u003e", "&": "\\u0026", "\u2028": "\\u2028", "\u2029": "\\u2029" };
+  return JSON.stringify(value).replace(/[<>&\u2028\u2029]/g, (c) => esc[c]);
+}
+
 export function escapeXml(s: string) {
   return s
     .replace(/&/g, "&amp;")

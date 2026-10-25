@@ -225,7 +225,7 @@ export function BulkTool() {
         <Card className="p-5">
           <p className="text-xs font-semibold uppercase tracking-wide text-brand">Step 1</p>
           <h2 className="font-display text-lg font-bold">QR type</h2>
-          <Select className="mt-3" value={typeId} onChange={(e) => changeType(e.target.value)}>
+          <Select className="mt-3" aria-label="QR type" value={typeId} onChange={(e) => changeType(e.target.value)}>
             {BULK_TYPES.map((t) => <option key={t.id} value={t.id}>{t.label}</option>)}
           </Select>
           <button onClick={downloadTemplate} className="mt-3 inline-flex items-center gap-1.5 text-sm font-semibold text-brand hover:underline"><FileDown className="h-4 w-4" /> Download CSV template</button>
@@ -259,23 +259,23 @@ export function BulkTool() {
               </Select>
             </Field>
             {bulkFields(type).map((f) => (
-              <Field key={f.name} label={<>{f.label}{f.required && <span className="text-rose-500"> *</span>}</>}>
-                <Select value={mapping[f.name] ?? NONE} onChange={(e) => setMapping({ ...mapping, [f.name]: e.target.value })}>
+              <Field key={f.name} htmlFor={`map-${f.name}`} label={<>{f.label}{f.required && <span className="text-rose-500"> *</span>}</>}>
+                <Select id={`map-${f.name}`} value={mapping[f.name] ?? NONE} onChange={(e) => setMapping({ ...mapping, [f.name]: e.target.value })}>
                   <option value={NONE}>— not used —</option>
                   <option value={FIXED}>Same value for every row…</option>
                   {headers.map((h) => <option key={h} value={h}>Column: {h}</option>)}
                 </Select>
                 {mapping[f.name] === FIXED && (
                   f.kind === "select" ? (
-                    <Select className="mt-2" value={fixed[f.name] ?? ""} onChange={(e) => setFixed({ ...fixed, [f.name]: e.target.value })}>
+                    <Select className="mt-2" aria-label={`${f.label}: fixed value`} value={fixed[f.name] ?? ""} onChange={(e) => setFixed({ ...fixed, [f.name]: e.target.value })}>
                       {f.options!.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
                     </Select>
                   ) : f.kind === "checkbox" ? (
-                    <Select className="mt-2" value={fixed[f.name] ?? "false"} onChange={(e) => setFixed({ ...fixed, [f.name]: e.target.value })}>
+                    <Select className="mt-2" aria-label={`${f.label}: fixed value`} value={fixed[f.name] ?? "false"} onChange={(e) => setFixed({ ...fixed, [f.name]: e.target.value })}>
                       <option value="false">No</option><option value="true">Yes</option>
                     </Select>
                   ) : (
-                    <Input className="mt-2" value={fixed[f.name] ?? ""} placeholder={f.placeholder} onChange={(e) => setFixed({ ...fixed, [f.name]: e.target.value })} />
+                    <Input className="mt-2" aria-label={`${f.label}: fixed value`} value={fixed[f.name] ?? ""} placeholder={f.placeholder} onChange={(e) => setFixed({ ...fixed, [f.name]: e.target.value })} />
                   )
                 )}
               </Field>
@@ -299,7 +299,7 @@ export function BulkTool() {
             <div className="flex flex-wrap items-end gap-2">
               <Segmented size="sm" value={format} onChange={setFormat} options={[{ value: "png", label: "PNG" }, { value: "svg", label: "SVG" }, { value: "both", label: "Both" }]} />
               {format !== "svg" && (
-                <Select className="w-auto py-1.5 text-xs" value={size} onChange={(e) => setSize(+e.target.value)}>
+                <Select className="w-auto py-1.5 text-xs" aria-label="Image size" value={size} onChange={(e) => setSize(+e.target.value)}>
                   <option value={512}>512 px</option><option value={1024}>1024 px</option><option value={2048}>2048 px</option>
                 </Select>
               )}

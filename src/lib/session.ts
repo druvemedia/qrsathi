@@ -1,13 +1,30 @@
+/**
+ * Sessions & authorization.
+ *
+ * Two independent, server-side sessions share one user table:
+ *  - qs_session  ordinary workspace session (30 days)
+ *  - qs_admin    admin-console session, created only via /admin/login after
+ *                role + (when enabled) MFA verification (12 hours, SameSite=Strict)
+ *
+ * Each cookie holds an HS256 token naming a Session row. A request is
+ * authenticated only if the row exists, is unexpired, belongs to an active user
+ * and matches the user's sessionVersion — so logout, password change,
+ * suspension and admin revocation take effect immediately.
+ */
 import { cache } from "react";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { SignJWT, jwtVerify } from "jose";
-import type { User } from "@prisma/client";
+import type { Session, User } from "@prisma/client";
 import { db } from "./db";
 import { ApiError } from "./api";
 import { getPlan } from "./plans";
+import { isAdminRole, isSuperAdmin } from "./roles";
 
 export const SESSION_COOKIE = "qs_session";
-const MAX_AGE = 60 * 60 * 24 * 30;
+export const ADMIN_COOKIE = "qs_admin";
+const USER_TTL = 60 * 60 * 24 * 30; // 30 days
+const ADMIN_TTL = 60 * 60 * 12; // 12 hours
+const ADMIN_IDLE = 60 * 60 * 2; // admin sessions end after 2 hours without activity
 
 export function authSecret() {
   const s = process.env.AUTH_SECRET;
@@ -15,52 +32,100 @@ export function authSecret() {
   return new TextEncoder().encode(s);
 }
 
-export async function createSession(user: Pick<User, "id" | "sessionVersion">) {
-  const token = await new SignJWT({ sv: user.sessionVersion })
+type Kind = "user" | "admin";
+const cookieName = (k: Kind) => (k === "admin" ? ADMIN_COOKIE : SESSION_COOKIE);
+
+/** Creates a fresh session row + cookie (a new id on every login prevents session fixation). */
+export async function createSession(user: Pick<User, "id" | "sessionVersion">, opts: { kind?: Kind; mfa?: boolean } = {}) {
+  const kind = opts.kind ?? "user";
+  const ttl = kind === "admin" ? ADMIN_TTL : USER_TTL;
+  const jar = await cookies();
+  // Replace any session this browser already holds for the same kind.
+  await revokeCookieSession(kind);
+  const ua = (await headers()).get("user-agent")?.slice(0, 255) ?? "";
+  const session = await db.session.create({
+    data: { userId: user.id, kind, mfa: !!opts.mfa, expiresAt: new Date(Date.now() + ttl * 1000), userAgent: ua },
+  });
+  const token = await new SignJWT({ sid: session.id, sv: user.sessionVersion, k: kind })
     .setProtectedHeader({ alg: "HS256" })
     .setSubject(user.id)
     .setIssuedAt()
-    .setExpirationTime(`${MAX_AGE}s`)
+    .setExpirationTime(`${ttl}s`)
     .sign(authSecret());
-  (await cookies()).set(SESSION_COOKIE, token, {
+  jar.set(cookieName(kind), token, {
     httpOnly: true,
-    sameSite: "lax",
+    sameSite: kind === "admin" ? "strict" : "lax",
     secure: process.env.NODE_ENV === "production",
     path: "/",
-    maxAge: MAX_AGE,
+    maxAge: ttl,
   });
+  return session;
 }
 
-export async function destroySession() {
-  (await cookies()).set(SESSION_COOKIE, "", { httpOnly: true, path: "/", maxAge: 0 });
-}
-
-export function isAdminEmail(email: string) {
-  return (process.env.ADMIN_EMAILS || "")
-    .split(",")
-    .map((e) => e.trim().toLowerCase())
-    .filter(Boolean)
-    .includes(email.toLowerCase());
-}
-
-/** Current signed-in, active user (or null). Memoised per request. */
-export const getUser = cache(async (): Promise<User | null> => {
-  const token = (await cookies()).get(SESSION_COOKIE)?.value;
+async function readToken(kind: Kind) {
+  const token = (await cookies()).get(cookieName(kind))?.value;
   if (!token) return null;
   try {
-    const { payload } = await jwtVerify(token, authSecret());
-    if (!payload.sub) return null;
-    const user = await db.user.findUnique({ where: { id: payload.sub } });
-    if (!user || user.status !== "active" || user.sessionVersion !== payload.sv) return null;
-    // Lapsed paid plans fall back to Free.
-    if (user.planExpiresAt && user.planExpiresAt < new Date() && user.plan !== "free") {
-      return db.user.update({ where: { id: user.id }, data: { plan: "free", planExpiresAt: null } });
-    }
-    return user;
+    const { payload } = await jwtVerify(token, authSecret(), { algorithms: ["HS256"] });
+    if (!payload.sub || typeof payload.sid !== "string" || payload.k !== kind) return null;
+    return payload as { sub: string; sid: string; sv: number; k: Kind };
   } catch {
     return null;
   }
-});
+}
+
+async function revokeCookieSession(kind: Kind) {
+  const p = await readToken(kind);
+  if (p) await db.session.deleteMany({ where: { id: p.sid } }).catch(() => {});
+}
+
+/** Logs out the current browser for this kind (row deleted, cookie cleared). */
+export async function destroySession(kind: Kind = "user") {
+  await revokeCookieSession(kind);
+  (await cookies()).set(cookieName(kind), "", { httpOnly: true, path: "/", maxAge: 0, sameSite: "lax", secure: process.env.NODE_ENV === "production" });
+}
+
+/** Ends every session of a user (password change/reset, suspension, admin revocation). */
+export async function revokeAllSessions(userId: string, opts: { exceptSessionId?: string } = {}) {
+  await db.session.deleteMany({ where: { userId, ...(opts.exceptSessionId ? { id: { not: opts.exceptSessionId } } : {}) } });
+}
+
+async function load(kind: Kind): Promise<{ user: User; session: Session } | null> {
+  const p = await readToken(kind);
+  if (!p) return null;
+  const session = await db.session.findUnique({ where: { id: p.sid }, include: { user: true } });
+  const now = new Date();
+  if (!session || session.userId !== p.sub || session.kind !== kind || session.expiresAt < now) return null;
+  const user = session.user;
+  if (user.status !== "active" || user.sessionVersion !== p.sv) return null;
+  if (kind === "admin") {
+    if (!isAdminRole(user.role)) return null;
+    if (now.getTime() - session.lastSeenAt.getTime() > ADMIN_IDLE * 1000) {
+      await db.session.delete({ where: { id: session.id } }).catch(() => {});
+      return null;
+    }
+    // MFA-enabled administrators must have verified MFA in this session.
+    if (user.mfaEnabledAt && !session.mfa) return null;
+  }
+  // Touch lastSeenAt at most once a minute.
+  if (now.getTime() - session.lastSeenAt.getTime() > 60_000) {
+    await db.session.update({ where: { id: session.id }, data: { lastSeenAt: now } }).catch(() => {});
+  }
+  // Lapsed paid plans fall back to Free.
+  if (user.planExpiresAt && user.planExpiresAt < now && user.plan !== "free") {
+    const u = await db.user.update({ where: { id: user.id }, data: { plan: "free", planExpiresAt: null } });
+    return { user: u, session };
+  }
+  const { user: _u, ...s } = session;
+  return { user, session: s as Session };
+}
+
+/** Current signed-in, active workspace user (or null). Memoised per request. */
+export const getUser = cache(async (): Promise<User | null> => (await load("user"))?.user ?? null);
+export const getUserSession = cache(async () => load("user"));
+
+/** Current admin-console session (or null). Memoised per request. */
+export const getAdmin = cache(async () => load("admin"));
 
 export async function requireUser() {
   const u = await getUser();
@@ -68,10 +133,19 @@ export async function requireUser() {
   return u;
 }
 
-export async function requireAdmin() {
-  const u = await requireUser();
-  if (u.role !== "admin") throw new ApiError(403, "Admin access required.");
-  return u;
+/**
+ * Admin API guard (deny by default): requires an admin-console session.
+ * A normal workspace session never grants admin access, even for admins.
+ * Super administrators must have MFA enabled before using admin APIs
+ * (except MFA enrolment itself: pass { allowWithoutMfa: true }).
+ */
+export async function requireAdmin(opts: { superAdmin?: boolean; allowWithoutMfa?: boolean } = {}) {
+  const a = await getAdmin();
+  if (!a) throw new ApiError(401, "Administrator sign-in required.");
+  if (isSuperAdmin(a.user.role) && !a.user.mfaEnabledAt && !opts.allowWithoutMfa)
+    throw new ApiError(403, "Enable two-factor authentication to use the admin console.");
+  if (opts.superAdmin && !isSuperAdmin(a.user.role)) throw new ApiError(403, "Super administrator access required.");
+  return a.user;
 }
 
 export function publicUser(u: User) {
@@ -86,6 +160,7 @@ export function publicUser(u: User) {
     planExpiresAt: u.planExpiresAt,
     hasPassword: !!u.passwordHash,
     google: !!u.googleId,
+    mfaEnabled: !!u.mfaEnabledAt,
     createdAt: u.createdAt,
   };
 }

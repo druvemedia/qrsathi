@@ -17,7 +17,7 @@ model User {
   name           String          @default("")
   passwordHash   String?
   googleId       String?         @unique
-  role           String          @default("user") // user | admin
+  role           String          @default("user") // user | admin | super_admin (assigned only server-side)
   plan           String          @default("free") // free | pro | business
   planExpiresAt  DateTime? // null = no expiry (free or admin-assigned)
   status         String          @default("active") // active | suspended
@@ -25,6 +25,12 @@ model User {
   createdAt      DateTime        @default(now())
   updatedAt      DateTime        @updatedAt
   lastLoginAt    DateTime?
+  // TOTP MFA (administrators). Secret is AES-256-GCM encrypted; enabled only after a verified code.
+  mfaSecret      String?
+  mfaEnabledAt   DateTime?
+  mfaLastStep    Int             @default(0) // last accepted TOTP time-step (replay protection)
+  sessions       Session[]
+  recoveryCodes  MfaRecoveryCode[]
   qrCodes        QrCode[]
   downloads      Download[]
   uploads        Upload[]
@@ -217,4 +223,60 @@ model InventoryTransaction {
 
   @@index([productId, createdAt])
   @@index([userId, createdAt])
+}
+
+// ---------- Sessions, MFA, audit, rate limiting ----------
+
+/// Server-side session. The cookie holds a signed token naming this row, so
+/// logout and revocation take effect immediately.
+model Session {
+  id         String   @id @default(cuid())
+  userId     String
+  kind       String   @default("user") // user | admin (admin = created through /admin/login)
+  mfa        Boolean  @default(false) // MFA verified for this session
+  createdAt  DateTime @default(now())
+  expiresAt  DateTime
+  lastSeenAt DateTime @default(now())
+  userAgent  String   @default("")
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model MfaRecoveryCode {
+  id        String    @id @default(cuid())
+  userId    String
+  codeHash  String    @unique // SHA-256 of a high-entropy one-time code
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+/// Security-relevant events and administrator actions (secrets never stored).
+model AuditLog {
+  id         String   @id @default(cuid())
+  actorId    String?
+  actorEmail String   @default("")
+  action     String // e.g. admin.user.suspend, auth.login_failed, auth.mfa_enabled
+  targetType String   @default("")
+  targetId   String   @default("")
+  details    String   @default("") // JSON, redacted
+  ip         String   @default("") // truncated / hashed per privacy settings
+  createdAt  DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([action])
+  @@index([actorId])
+}
+
+/// Fixed-window counters for RATE_LIMIT_STORE=database (multi-instance deployments).
+model RateLimit {
+  key     String   @id
+  count   Int      @default(0)
+  resetAt DateTime
+
+  @@index([resetAt])
 }

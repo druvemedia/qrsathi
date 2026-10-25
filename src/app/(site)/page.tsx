@@ -7,6 +7,7 @@ import { TypeIcon } from "@/components/icon";
 import { LinkButton } from "@/components/ui";
 import { QuickGenerator } from "@/components/home/quick-generator";
 import { getSettings } from "@/lib/settings";
+import { safeJsonLd } from "@/lib/utils";
 import { renderQr } from "@/lib/qr-render";
 import { TEMPLATES } from "@/lib/templates";
 
@@ -23,7 +24,7 @@ export default async function HomePage() {
   };
   return (
     <>
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: safeJsonLd(jsonLd) }} />
       {/* Hero + generator */}
       <section className="relative overflow-hidden">
         <div className="pointer-events-none absolute inset-0 -z-10">

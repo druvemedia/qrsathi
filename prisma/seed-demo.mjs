@@ -4,7 +4,8 @@
  * and is labelled "Demo" in the UI and in CSV exports.
  *
  *   npm run seed:demo
- * Login: demo@demo.local / demo12345   (admin: admin@demo.local / admin12345 if listed in ADMIN_EMAILS)
+ * Login: demo@demo.local / demo12345 (an ordinary user; development only).
+ * It never creates administrators: use `npm run admin -- create ...` for that.
  */
 import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
@@ -18,6 +19,10 @@ try {
   }
 } catch {}
 
+if (process.env.NODE_ENV === "production") {
+  console.error("Refusing to seed demo data when NODE_ENV=production.");
+  process.exit(1);
+}
 if (process.env.DEMO_MODE !== "true") {
   console.error("Refusing to seed: set DEMO_MODE=\"true\" in .env (never in production).");
   process.exit(1);
@@ -25,7 +30,6 @@ if (process.env.DEMO_MODE !== "true") {
 
 const db = new PrismaClient();
 const base = (process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000").replace(/\/$/, "");
-const admins = (process.env.ADMIN_EMAILS || "").split(",").map((s) => s.trim().toLowerCase());
 
 async function upsertUser(email, name, password, role = "user", plan = "free") {
   const passwordHash = await bcrypt.hash(password, 12);
@@ -33,7 +37,6 @@ async function upsertUser(email, name, password, role = "user", plan = "free") {
 }
 
 const demo = await upsertUser("demo@demo.local", "Demo Shopkeeper", "demo12345", "user", "pro");
-if (admins.includes("admin@demo.local")) await upsertUser("admin@demo.local", "Demo Admin", "admin12345", "admin", "business");
 
 await db.qrCode.deleteMany({ where: { userId: demo.id, isDemo: true } });
 

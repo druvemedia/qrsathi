@@ -1,0 +1,30 @@
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 10
+    groups:
+      # Patch/minor updates of tooling in one PR; framework majors stay separate for review.
+      dev-tooling:
+        dependency-type: development
+        update-types: [minor, patch]
+      prisma:
+        patterns: ["prisma", "@prisma/*"]
+      next-react:
+        patterns: ["next", "react", "react-dom", "eslint-config-next"]
+    ignore:
+      # Major upgrades need a migration plan (Prisma 7 config, Next 16, Tailwind 4).
+      - dependency-name: "prisma"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@prisma/client"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "tailwindcss"
+        update-types: ["version-update:semver-major"]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly

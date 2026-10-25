@@ -56,10 +56,10 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
 
   const items = useMemo(() => {
     const s = q.trim().toLowerCase();
-    const pages: Cmd[] = NAV_ITEMS.filter((n) => !n.admin || user?.role === "admin").map((n) => ({ id: n.href, label: n.label, icon: n.icon, href: n.href, group: "Go to", keywords: n.keywords }));
+    const pages: Cmd[] = NAV_ITEMS.map((n) => ({ id: n.href, label: n.label, icon: n.icon, href: n.href, group: "Go to", keywords: n.keywords }));
     const match = (c: Cmd) => !s || `${c.label} ${c.keywords || ""}`.toLowerCase().includes(s);
     return [...ACTIONS.filter(match), ...pages.filter(match), ...remote];
-  }, [q, remote, user]);
+  }, [q, remote]);
 
   useEffect(() => setActive(0), [q]);
   useEffect(() => {

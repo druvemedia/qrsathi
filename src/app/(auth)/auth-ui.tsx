@@ -5,6 +5,7 @@ import { useState } from "react";
 import { BarChart3, Eye, EyeOff, IndianRupee, RefreshCw, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "@/lib/fetcher";
+import { safeNextPath } from "@/lib/safe-redirect";
 import { Logo } from "@/components/brand";
 import { useApp } from "@/components/providers";
 import { ThemeToggle } from "@/components/user-menu";
@@ -78,9 +79,7 @@ const ERRORS: Record<string, string> = {
   signups_closed: "New sign-ups are currently closed.",
 };
 
-function safeNext(n: string | null) {
-  return n && n.startsWith("/") && !n.startsWith("//") ? n : "/dashboard";
-}
+const safeNext = (n: string | null) => safeNextPath(n);
 
 export function LoginForm({ google }: { google: boolean }) {
   const sp = useSearchParams();

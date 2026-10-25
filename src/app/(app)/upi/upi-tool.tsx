@@ -95,9 +95,9 @@ export function UpiTool() {
             {tab === "details" ? (
               <div className="space-y-5">
                 <div className="grid gap-4 sm:grid-cols-2">
-                  <Field label="UPI ID (VPA)" required error={err("vpa")} hint="e.g. yourshop@okaxis, 9876543210@ybl" className="sm:col-span-2">
+                  <Field label="UPI ID (VPA)" htmlFor="upi-vpa" required error={err("vpa")} hint="e.g. yourshop@okaxis, 9876543210@ybl" className="sm:col-span-2">
                     <div className="flex gap-2">
-                      <Input value={data.vpa} onChange={(e) => set("vpa", e.target.value)} onBlur={() => blur("vpa")} invalid={!!err("vpa")} placeholder="yourshop@bank" autoComplete="off" spellCheck={false} />
+                      <Input id="upi-vpa" value={data.vpa} onChange={(e) => set("vpa", e.target.value)} onBlur={() => blur("vpa")} invalid={!!err("vpa")} placeholder="yourshop@bank" autoComplete="off" spellCheck={false} />
                       <Button variant="outline" onClick={copyVpa} disabled={!data.vpa} aria-label="Copy UPI ID">{copied ? <Check className="h-4 w-4 text-emerald-600" /> : <Copy className="h-4 w-4" />}</Button>
                     </div>
                   </Field>
@@ -113,7 +113,7 @@ export function UpiTool() {
                     <Field error={err("amount")} className="mt-3" hint="Max 2 decimals. The payer's app pre-fills this; some apps let the payer edit it.">
                       <div className="relative">
                         <IndianRupee className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                        <Input value={data.amount} inputMode="decimal" onChange={(e) => set("amount", e.target.value)} onBlur={() => blur("amount")} invalid={!!err("amount")} className="pl-9" placeholder="250" />
+                        <Input aria-label="Amount in rupees" value={data.amount} inputMode="decimal" onChange={(e) => set("amount", e.target.value)} onBlur={() => blur("amount")} invalid={!!err("amount")} className="pl-9" placeholder="250" />
                       </div>
                     </Field>
                   ) : (

@@ -1,5 +1,5 @@
 import { db } from "@/lib/db";
-import { ApiError, baseUrl, handle, json } from "@/lib/api";
+import { ApiError, assertBodySize, baseUrl, handle, json } from "@/lib/api";
 import { requireUser } from "@/lib/session";
 import { getPlan } from "@/lib/plans";
 import { rateLimit } from "@/lib/rate-limit";
@@ -14,7 +14,9 @@ export const GET = handle(async (req) => {
 
 export const POST = handle(async (req) => {
   const user = await requireUser();
-  rateLimit(`upload:${user.id}`, 30, 60 * 60 * 1000);
+  await rateLimit(`upload:${user.id}`, 30, 60 * 60 * 1000);
+  // Reject oversized bodies before buffering them in memory.
+  assertBodySize(req, getPlan(user.plan).uploadMb * 1024 * 1024 + 64 * 1024);
   const form = await req.formData().catch(() => null);
   const file = form?.get("file");
   if (!(file instanceof File)) throw new ApiError(400, "No file received.");

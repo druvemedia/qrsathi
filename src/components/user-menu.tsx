@@ -6,6 +6,7 @@ import { History, LayoutDashboard, Library, LogOut, Moon, Settings, Shield, Sun 
 import { toast } from "sonner";
 import { useApp } from "./providers";
 import { LinkButton } from "./ui";
+import { isAdminRole } from "@/lib/roles";
 
 export function ThemeToggle() {
   const { theme, toggleTheme } = useApp();
@@ -73,7 +74,7 @@ export function UserMenu() {
             { href: "/codes", label: "My QR codes", icon: Library },
             { href: "/dashboard/history", label: "Download history", icon: History },
             { href: "/dashboard/settings", label: "Settings", icon: Settings },
-            ...(user.role === "admin" ? [{ href: "/admin", label: "Admin", icon: Shield }] : []),
+            ...(isAdminRole(user.role) ? [{ href: "/admin/login", label: "Admin console", icon: Shield }] : []),
           ].map((i) => (
             <Link key={i.href} href={i.href} onClick={() => setOpen(false)} role="menuitem" className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm hover:bg-slate-100 dark:hover:bg-slate-800">
               <i.icon className="h-4 w-4 text-slate-500" />

@@ -1,0 +1,91 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    name: Typecheck, lint, unit tests, build, API tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      # Throw-away values for CI only — never real secrets.
+      DATABASE_URL: file:./ci.db
+      AUTH_SECRET: ci-only-${{ github.run_id }}-0123456789abcdefghijklmnopqrstuvwxyz
+      MFA_ENCRYPTION_KEY: ci-mfa-${{ github.run_id }}-0123456789abcdefghijklmnopqrstuvwxyz
+      NEXT_PUBLIC_APP_URL: http://localhost:3100
+      RAZORPAY_WEBHOOK_SECRET: ci-webhook-only-${{ github.run_id }}
+      NEXT_TELEMETRY_DISABLED: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Lint
+        run: npm run lint
+      - name: MySQL schema is in sync with prisma/schema.prisma
+        run: npm run db:mysql:schema -- --check
+      - name: Dependency licences
+        run: npm run license:check
+      - name: Unit tests (security, QR, barcodes)
+        run: npm test
+      - name: Dependency audit (production; high/critical must be fixed or explicitly accepted)
+        run: npm run audit:check
+      - name: Create database
+        run: npx prisma db push --skip-generate
+      - name: Build
+        run: npm run build
+      - name: Start server
+        run: |
+          NODE_ENV=production DEMO_MODE=false npx next start -p 3100 > server.log 2>&1 &
+          for i in $(seq 1 60); do curl -sf http://localhost:3100/api/health && exit 0; sleep 1; done
+          cat server.log; exit 1
+      - name: API tests
+        run: BASE_URL=http://localhost:3100 npm run test:api
+      - name: Auth / RBAC / admin tests
+        run: BASE_URL=http://localhost:3100 BUILD_DIR=.next TEST_AUTH_SECRET="$AUTH_SECRET" TEST_MFA_KEY="$MFA_ENCRYPTION_KEY" TEST_WEBHOOK_SECRET="$RAZORPAY_WEBHOOK_SECRET" DATABASE_URL="file:$(pwd)/prisma/ci.db" npm run test:admin
+      - name: Browser tests (scanner, responsive, CSP, accessibility, admin console)
+        run: BASE_URL=http://localhost:3100 BROWSER=/usr/bin/google-chrome DATABASE_URL="file:$(pwd)/prisma/ci.db" npm run test:browser
+      - name: Server log
+        if: failure()
+        run: cat server.log || true
+
+  mysql:
+    name: MySQL 8.4 migrations + data migration
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: ci-root-only
+        ports: ["3306:3306"]
+        options: >-
+          --health-cmd="mysqladmin ping -uroot -pci-root-only --silent"
+          --health-interval=5s --health-timeout=5s --health-retries=20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+        env:
+          DATABASE_URL: file:./ci.db
+      - name: MySQL integration test
+        run: npm run test:mysql
+        env:
+          MYSQL_TEST_URL: mysql://root:ci-root-only@127.0.0.1:3306/

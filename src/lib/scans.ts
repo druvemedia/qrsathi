@@ -2,6 +2,7 @@ import { createHash } from "crypto";
 import type { QrCode } from "@prisma/client";
 import { db } from "./db";
 import { parseUa } from "./ua";
+import { withinLimit } from "./rate-limit";
 
 /**
  * Records a scan of a dynamic QR / hosted page.
@@ -14,6 +15,8 @@ import { parseUa } from "./ua";
 export async function recordScan(qr: Pick<QrCode, "id" | "trackScans">, headers: Headers, ip: string) {
   const info = parseUa(headers.get("user-agent"));
   if (info.device === "bot") return; // link-preview fetchers etc. are not scans
+  // One client can add at most 20 scans per code per 10 minutes (stops analytics inflation; the visitor is still served).
+  if (!(await withinLimit(`scan:${qr.id}:${ip}`, 20, 10 * 60 * 1000))) return;
   const optOut = headers.get("dnt") === "1" || headers.get("sec-gpc") === "1" || !qr.trackScans;
   const day = new Date().toISOString().slice(0, 10);
   const country = (headers.get("x-vercel-ip-country") || headers.get("cf-ipcountry") || headers.get("x-country-code") || "")

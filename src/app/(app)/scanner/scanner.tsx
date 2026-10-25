@@ -31,9 +31,11 @@ export function Scanner() {
   const [drag, setDrag] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
   const resultsRef = useRef<HTMLDivElement>(null);
-  const canPaste = typeof navigator !== "undefined" && !!navigator.clipboard && "read" in navigator.clipboard;
+  // Detected after mount: the server can't know, and reading it during render caused a hydration mismatch.
+  const [canPaste, setCanPaste] = useState(false);
 
   useEffect(() => {
+    setCanPaste(!!navigator.clipboard && "read" in navigator.clipboard);
     setHistory(loadHistory());
     return onHistoryChange(() => setHistory(loadHistory()));
   }, []);

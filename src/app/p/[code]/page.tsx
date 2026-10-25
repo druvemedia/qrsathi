@@ -4,6 +4,7 @@ import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import { db } from "@/lib/db";
 import { recordScan } from "@/lib/scans";
+import { ipFromHeaders } from "@/lib/api";
 import { getSettings } from "@/lib/settings";
 import { HostedPage } from "@/components/hosted-page";
 
@@ -45,8 +46,7 @@ export default async function HostedRoute({ params }: Props) {
   }
 
   const h = await headers();
-  const ip = h.get("cf-connecting-ip") || h.get("x-real-ip") || h.get("x-forwarded-for")?.split(",")[0]?.trim() || "0.0.0.0";
-  await recordScan(qr, h, ip);
+  await recordScan(qr, h, ipFromHeaders(h));
 
   return (
     <div className="min-h-screen bg-slate-50">

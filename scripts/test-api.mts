@@ -118,7 +118,8 @@ try {
   check("user B's product list is empty", (await call("GET", "/api/products", undefined, B.cookie)).data.items.length === 0);
   const bSame = await call("POST", "/api/products", { name: "Same SKU other user", sku: "TEST-CHAI-250", barcodes: [{ format: "upca", value: "036000291452", source: "existing" }] }, B.cookie);
   check("same SKU/barcode allowed for a different user", bSame.status === 201, bSame.data);
-  check("normal user can't access admin API (403)", (await call("GET", "/api/admin/stats", undefined, A.cookie)).status === 403);
+  // A workspace session is never an admin-console session → unauthenticated for /api/admin (deny).
+  check("normal user can't access admin API (401)", (await call("GET", "/api/admin/stats", undefined, A.cookie)).status === 401);
 
   // ---------- edit / archive ----------
   console.log("\n# Edit & archive");

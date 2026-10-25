@@ -1,0 +1,47 @@
+name: Bug report
+description: Something doesn't work as expected
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Security vulnerabilities must not be reported here.** Use *Security → Report a vulnerability* instead (see SECURITY.md).
+        Don't paste passwords, tokens, `.env` contents or customer data.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: Include the page or API route and any error message shown.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Go to …
+        2. Click …
+        3. See …
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect?
+    validations:
+      required: true
+  - type: dropdown
+    id: db
+    attributes:
+      label: Database
+      options: [SQLite (development), MySQL, Not sure]
+  - type: input
+    id: env
+    attributes:
+      label: Environment
+      placeholder: "Version/commit, Node version, browser/device"
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant log lines (redacted)
+      render: text

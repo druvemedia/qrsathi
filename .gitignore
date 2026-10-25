@@ -1,16 +1,61 @@
+# ---------- Dependencies & build output ----------
 node_modules
 .next
+.next-*
 out
-*.db
-*.db-journal
-.env
-.env.local
-uploads/*
-!uploads/.gitkeep
+build
+dist
+coverage
 next-env.d.ts
 *.tsbuildinfo
-.next-*
+# Copied from node_modules by scripts/copy-wasm.mjs
 public/zxing/
 
-# Local database backups (contain user data)
-prisma/*.backup*
+# ---------- Secrets & local configuration (never commit) ----------
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+*.crt
+id_rsa*
+*.keystore
+credentials*.json
+service-account*.json
+
+# ---------- Databases, backups & user data (contain personal data) ----------
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite3
+*.backup*
+*.bak
+*.dump
+*.sql.gz
+prisma/backups/
+backups/
+# Generated MySQL migration client
+node_modules/.qrsathi/
+# Uploaded files
+uploads/*
+!uploads/.gitkeep
+
+# ---------- Logs & test artefacts ----------
+*.log
+npm-debug.log*
+logs/
+screenshots/
+test-results/
+playwright-report/
+
+# ---------- Editors / OS ----------
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+*.swp

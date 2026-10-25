@@ -13,7 +13,8 @@ const schema = z.object({
 });
 
 export const POST = handle(async (req) => {
-  rateLimit(`report:${clientIp(req)}`, 10, 60 * 60 * 1000);
+  await rateLimit(`report:${clientIp(req)}`, 10, 60 * 60 * 1000);
+  await rateLimit("report:global", 500, 60 * 60 * 1000);
   const body = await readJson(req, schema);
   const code = body.shortCode || /\/(?:r|p)\/([\w-]{3,40})/.exec(body.url)?.[1] || "";
   await db.abuseReport.create({

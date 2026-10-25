@@ -1,0 +1,289 @@
+// GENERATED from prisma/schema.prisma by scripts/db/mysql-schema.mjs — do not edit.
+// MySQL 8.0+ (utf8mb4). Run `npm run db:mysql:schema` after changing the main schema.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// Separate client used only by scripts/db/sqlite-to-mysql.mts, so generating it
+// never replaces the app's development (SQLite) client.
+generator mysqlMigrate {
+  provider = "prisma-client-js"
+  output   = "../../node_modules/.qrsathi/mysql-client"
+}
+
+datasource db {
+  provider     = "mysql"
+  url          = env("DATABASE_URL")
+  relationMode = "foreignKeys"
+}
+
+model User {
+  id             String          @id @default(cuid())
+  email          String          @unique
+  name           String          @default("")
+  passwordHash   String?
+  googleId       String?         @unique
+  role           String          @default("user") // user | admin | super_admin (assigned only server-side)
+  plan           String          @default("free") // free | pro | business
+  planExpiresAt  DateTime? // null = no expiry (free or admin-assigned)
+  status         String          @default("active") // active | suspended
+  sessionVersion Int             @default(0)
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  lastLoginAt    DateTime?
+  // TOTP MFA (administrators). Secret is AES-256-GCM encrypted; enabled only after a verified code.
+  mfaSecret      String? @db.Text
+  mfaEnabledAt   DateTime?
+  mfaLastStep    Int             @default(0) // last accepted TOTP time-step (replay protection)
+  sessions       Session[]
+  recoveryCodes  MfaRecoveryCode[]
+  qrCodes        QrCode[]
+  downloads      Download[]
+  uploads        Upload[]
+  resets         PasswordReset[]
+  payments       Payment[]
+  products       Product[]
+  barcodes       Barcode[]
+  inventoryTx    InventoryTransaction[]
+}
+
+model PasswordReset {
+  id        String    @id @default(cuid())
+  userId    String
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model QrCode {
+  id          String     @id @default(cuid())
+  userId      String
+  name        String
+  type        String
+  content     String @db.MediumText // JSON: form data for the QR type
+  design      String @db.MediumText // JSON: design settings
+  payload     String @db.Text // exact text encoded in the QR image
+  isDynamic   Boolean    @default(false)
+  isHosted    Boolean    @default(false) // landing page served at /p/[shortCode]
+  shortCode   String?    @unique
+  destination String? @db.Text // dynamic redirect target
+  status      String     @default("active") // active | paused | disabled (admin)
+  expiresAt   DateTime?
+  utm         String? @db.Text // JSON: { source, medium, campaign, term, content }
+  campaign    String     @default("")
+  trackScans  Boolean    @default(true)
+  favorite    Boolean    @default(false)
+  isDemo      Boolean    @default(false)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  user        User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  scans       Scan[]
+  downloads   Download[]
+
+  @@index([userId])
+}
+
+model Scan {
+  id          String   @id @default(cuid())
+  qrId        String
+  createdAt   DateTime @default(now())
+  device      String   @default("unknown") // mobile | tablet | desktop | bot | unknown
+  browser     String   @default("unknown")
+  os          String   @default("unknown")
+  country     String   @default("") // ISO code from hosting platform header, if any
+  visitorHash String   @default("") // salted daily hash, never raw IP
+  isDemo      Boolean  @default(false)
+  qr          QrCode   @relation(fields: [qrId], references: [id], onDelete: Cascade)
+
+  @@index([qrId, createdAt])
+}
+
+model Download {
+  id        String   @id @default(cuid())
+  userId    String
+  qrId      String?
+  name      String
+  format    String
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  qr        QrCode?  @relation(fields: [qrId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt])
+}
+
+model Upload {
+  id         String   @id @default(cuid())
+  userId     String
+  filename   String @db.VarChar(255)
+  storedName String   @unique
+  mime       String
+  size       Int
+  createdAt  DateTime @default(now())
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model AbuseReport {
+  id            String   @id @default(cuid())
+  shortCode     String   @default("")
+  url           String   @default("") @db.VarChar(2000)
+  reason        String
+  details       String   @default("") @db.VarChar(2000)
+  reporterEmail String   @default("")
+  status        String   @default("open") // open | resolved | dismissed
+  createdAt     DateTime @default(now())
+}
+
+model Payment {
+  id          String   @id @default(cuid())
+  userId      String
+  provider    String // razorpay
+  providerRef String   @unique // payment link id
+  plan        String
+  amount      Int // in paise
+  status      String   @default("created") // created | paid | failed | expired
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Log {
+  id        String   @id @default(cuid())
+  level     String // info | warn | error
+  event     String
+  message   String   @default("") @db.VarChar(2000)
+  userId    String?
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+}
+
+model Setting {
+  key   String @id
+  value String @db.Text
+}
+
+// ---------- Products & inventory ----------
+
+model Product {
+  id           String                 @id @default(cuid())
+  userId       String
+  name         String
+  sku          String
+  productCode  String                 @default("") // internal product ID
+  brand        String                 @default("")
+  category     String                 @default("")
+  variant      String                 @default("") // size / colour / variant
+  description  String                 @default("") @db.VarChar(2000)
+  manufacturer String                 @default("")
+  imageUrl     String                 @default("") @db.VarChar(1000)
+  priceMinor   Int                    @default(0) // price in minor units (paise)
+  currency     String                 @default("INR")
+  stock        Int                    @default(0)
+  lowStockAt   Int                    @default(5)
+  batch        String                 @default("")
+  expiryDate   DateTime?
+  status       String                 @default("active") // active | archived
+  createdAt    DateTime               @default(now())
+  updatedAt    DateTime               @updatedAt
+  user         User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  barcodes     Barcode[]
+  transactions InventoryTransaction[]
+
+  @@unique([userId, sku])
+  @@index([userId, status])
+  @@index([userId, category])
+}
+
+model Barcode {
+  id        String   @id @default(cuid())
+  userId    String
+  productId String
+  format    String @db.VarChar(32) // id from src/lib/barcodes.ts
+  value     String @db.VarChar(1500) // exact encoded text
+  lookupKey String @db.VarChar(1500) // canonical key for scan matching (GTIN-14 for EAN/UPC family)
+  source    String   @default("internal") // internal | assigned (GS1-allocated) | existing
+  isPrimary Boolean  @default(false)
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, format, value(length: 512)])
+  @@index([userId, lookupKey(length: 512)])
+  @@index([productId])
+}
+
+model InventoryTransaction {
+  id        String   @id @default(cuid())
+  userId    String
+  productId String
+  type      String // created | in | out | adjust | updated | archived | restored | imported
+  quantity  Int      @default(0) // signed change in stock
+  balance   Int      @default(0) // stock after this entry
+  note      String   @default("") @db.VarChar(500)
+  reference String   @default("")
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId, createdAt])
+  @@index([userId, createdAt])
+}
+
+// ---------- Sessions, MFA, audit, rate limiting ----------
+
+/// Server-side session. The cookie holds a signed token naming this row, so
+/// logout and revocation take effect immediately.
+model Session {
+  id         String   @id @default(cuid())
+  userId     String
+  kind       String   @default("user") // user | admin (admin = created through /admin/login)
+  mfa        Boolean  @default(false) // MFA verified for this session
+  createdAt  DateTime @default(now())
+  expiresAt  DateTime
+  lastSeenAt DateTime @default(now())
+  userAgent  String   @default("") @db.VarChar(255)
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model MfaRecoveryCode {
+  id        String    @id @default(cuid())
+  userId    String
+  codeHash  String    @unique // SHA-256 of a high-entropy one-time code
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+/// Security-relevant events and administrator actions (secrets never stored).
+model AuditLog {
+  id         String   @id @default(cuid())
+  actorId    String?
+  actorEmail String   @default("")
+  action     String // e.g. admin.user.suspend, auth.login_failed, auth.mfa_enabled
+  targetType String   @default("")
+  targetId   String   @default("")
+  details    String   @default("") @db.VarChar(4000) // JSON, redacted
+  ip         String   @default("") // truncated / hashed per privacy settings
+  createdAt  DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([action])
+  @@index([actorId])
+}
+
+/// Fixed-window counters for RATE_LIMIT_STORE=database (multi-instance deployments).
+model RateLimit {
+  key     String   @id
+  count   Int      @default(0)
+  resetAt DateTime
+
+  @@index([resetAt])
+}

@@ -1,39 +1,82 @@
 import { z } from "zod";
 import { db } from "@/lib/db";
-import { ApiError, handle, json, readJson } from "@/lib/api";
-import { requireAdmin } from "@/lib/session";
-import { logEvent } from "@/lib/log";
+import { ApiError, clientIp, handle, json, readJson } from "@/lib/api";
+import { requireAdmin, revokeAllSessions } from "@/lib/session";
+import { assertCanManage, assertNotLastSuperAdmin } from "@/lib/admin-users";
+import { sendPasswordReset } from "@/lib/password-reset";
+import { deleteStoredFile } from "@/lib/storage";
+import { audit } from "@/lib/audit";
 
 type Ctx = { params: Promise<{ id: string }> };
 
-const schema = z.object({
-  role: z.enum(["user", "admin"]).optional(),
+const patchSchema = z.object({
+  role: z.enum(["user", "admin", "super_admin"]).optional(),
   plan: z.enum(["free", "pro", "business"]).optional(),
   status: z.enum(["active", "suspended"]).optional(),
 });
 
+async function target(id: string) {
+  const u = await db.user.findUnique({ where: { id } });
+  if (!u) throw new ApiError(404, "User not found.");
+  return u;
+}
+
 export const PATCH = handle<Ctx>(async (req, { params }) => {
   const admin = await requireAdmin();
   const { id } = await params;
-  const body = await readJson(req, schema);
-  if (id === admin.id && (body.role === "user" || body.status === "suspended"))
-    throw new ApiError(400, "You can't demote or suspend your own account.");
-  const target = await db.user.findUnique({ where: { id } });
-  if (!target) throw new ApiError(404, "User not found.");
+  const body = await readJson(req, patchSchema, 10_000);
+  const user = await target(id);
+  if (body.role !== undefined) await assertCanManage(admin, user, "role");
+  if (body.status !== undefined) await assertCanManage(admin, user, "status");
+  if (body.plan !== undefined) await assertCanManage(admin, user, "plan");
+  await assertNotLastSuperAdmin(user, body);
   const data: Record<string, unknown> = { ...body };
   if (body.plan) data.planExpiresAt = null; // admin-assigned plans don't lapse
-  if (body.status === "suspended") data.sessionVersion = { increment: 1 }; // sign them out everywhere
-  const user = await db.user.update({ where: { id }, data });
-  await logEvent("info", "admin.user_updated", `${user.email}: ${JSON.stringify(body)}`, admin.id);
-  return json({ ok: true });
+  const roleChanged = body.role !== undefined && body.role !== user.role;
+  const suspended = body.status === "suspended" && user.status !== "suspended";
+  // Suspension or role change invalidates every session (incl. admin console).
+  if (suspended || roleChanged) data.sessionVersion = { increment: 1 };
+  if (roleChanged && body.role === "user") Object.assign(data, { mfaEnabledAt: null, mfaSecret: null, mfaLastStep: 0 });
+  const updated = await db.user.update({ where: { id }, data });
+  if (suspended || roleChanged) await revokeAllSessions(id);
+  await audit(roleChanged ? "admin.user.role_changed" : suspended ? "admin.user.suspended" : body.status === "active" ? "admin.user.reactivated" : "admin.user.updated", {
+    actor: admin, targetType: "user", targetId: id, ip: clientIp(req),
+    details: { from: { role: user.role, plan: user.plan, status: user.status }, to: body },
+  });
+  return json({ ok: true, user: { id: updated.id, role: updated.role, plan: updated.plan, status: updated.status } });
 });
 
-export const DELETE = handle<Ctx>(async (_req, { params }) => {
+const actionSchema = z.object({ action: z.enum(["revoke_sessions", "send_password_reset"]) });
+
+/** Account-recovery actions. Admins never see or set a user's password. */
+export const POST = handle<Ctx>(async (req, { params }) => {
   const admin = await requireAdmin();
   const { id } = await params;
-  if (id === admin.id) throw new ApiError(400, "You can't delete your own account here.");
-  const user = await db.user.delete({ where: { id } }).catch(() => null);
-  if (!user) throw new ApiError(404, "User not found.");
-  await logEvent("warn", "admin.user_deleted", user.email, admin.id);
+  const { action } = await readJson(req, actionSchema, 10_000);
+  const user = await target(id);
+  if (action === "revoke_sessions") {
+    await assertCanManage(admin, user, "sessions");
+    await db.user.update({ where: { id }, data: { sessionVersion: { increment: 1 } } });
+    await revokeAllSessions(id);
+    await audit("admin.user.sessions_revoked", { actor: admin, targetType: "user", targetId: id, ip: clientIp(req) });
+    return json({ ok: true, message: "All sessions for this account were signed out." });
+  }
+  await assertCanManage(admin, user, "reset");
+  if (user.status !== "active") throw new ApiError(400, "Reactivate the account before sending a reset link.");
+  const sent = await sendPasswordReset(user, req);
+  await audit("admin.user.password_reset_sent", { actor: admin, targetType: "user", targetId: id, ip: clientIp(req), details: { delivered: sent } });
+  return json({ ok: true, message: sent ? "A password-reset link was e-mailed to the user." : "Reset link created, but e-mail isn't configured (SMTP). The user can use “Forgot password”." });
+});
+
+export const DELETE = handle<Ctx>(async (req, { params }) => {
+  const admin = await requireAdmin({ superAdmin: true });
+  const { id } = await params;
+  const user = await target(id);
+  await assertCanManage(admin, user, "delete");
+  await assertNotLastSuperAdmin(user, { delete: true });
+  const uploads = await db.upload.findMany({ where: { userId: id }, select: { storedName: true } });
+  await db.user.delete({ where: { id } });
+  for (const u of uploads) await deleteStoredFile(u.storedName);
+  await audit("admin.user.deleted", { actor: admin, targetType: "user", targetId: id, ip: clientIp(req), details: { email: user.email } });
   return json({ ok: true });
 });

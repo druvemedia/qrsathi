@@ -1,6 +1,6 @@
 import {
   BarChart3, Barcode, CircleHelp, CreditCard, FileSpreadsheet, History, IndianRupee, LayoutDashboard, Library, Package, Palette,
-  QrCode, RefreshCw, ScanLine, Settings, Shield, Warehouse, type LucideIcon,
+  QrCode, RefreshCw, ScanLine, Settings, Warehouse, type LucideIcon,
 } from "lucide-react";
 
 export interface NavItem {
@@ -9,7 +9,6 @@ export interface NavItem {
   icon: LucideIcon;
   /** Short hint used by the quick-action launcher. */
   keywords?: string;
-  admin?: boolean;
 }
 export interface NavGroup {
   id: string;
@@ -59,7 +58,6 @@ export const NAV: NavGroup[] = [
     items: [
       { href: "/dashboard/settings", label: "Settings", icon: Settings, keywords: "profile password theme" },
       { href: "/help", label: "Help & Support", icon: CircleHelp, keywords: "faq support" },
-      { href: "/admin", label: "Admin", icon: Shield, keywords: "users reports", admin: true },
     ],
   },
 ];

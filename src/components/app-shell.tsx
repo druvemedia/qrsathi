@@ -24,7 +24,6 @@ function useIsActive() {
 }
 
 function NavLinks({ collapsed = false, onNavigate }: { collapsed?: boolean; onNavigate?: () => void }) {
-  const { user } = useApp();
   const isActive = useIsActive();
   const pathname = usePathname();
   const [moreOpen, setMoreOpen] = useState(false);
@@ -36,7 +35,7 @@ function NavLinks({ collapsed = false, onNavigate }: { collapsed?: boolean; onNa
   return (
     <nav className="flex flex-col gap-5" aria-label="Main">
       {NAV.map((g) => {
-        const items = g.items.filter((i) => !i.admin || user?.role === "admin");
+        const items = g.items;
         const hidden = g.secondary && !moreOpen && !collapsed;
         return (
           <div key={g.id}>
