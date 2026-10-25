@@ -376,7 +376,6 @@ export function renderBarcodeSvg(formatId: string, value: string, o: BarcodeRend
     text: value,
     scale: o.scale ?? 2,
     includetext: f.dims === "1d" ? o.showText ?? true : false,
-    textxalign: "center",
     paddingwidth: margin,
     paddingheight: f.dims === "1d" ? Math.round(margin / 2) : margin,
     barcolor: (o.color || "000000").replace("#", ""),
