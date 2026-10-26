@@ -15,7 +15,9 @@ import { NAV, activeItem, breadcrumbsFor } from "./nav-config";
 import { Breadcrumbs, Kbd, Tooltip } from "./ui";
 import { cn } from "@/lib/utils";
 
-const COLLAPSE_KEY = "qrsathi:sidebar-collapsed";
+// v2: earlier builds hid the expand control at the bottom of the rail, so a stale
+// "collapsed" preference is ignored and every browser starts expanded again.
+const COLLAPSE_KEY = "qrsathi:sidebar-collapsed:v2";
 
 function useIsActive() {
   const pathname = usePathname();
@@ -118,24 +120,30 @@ function CreateButton({ collapsed, onNavigate }: { collapsed?: boolean; onNaviga
   );
 }
 
-/** Desktop sidebar, collapsible to an icon rail (state remembered on this device). */
+function SidebarToggle({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => void }) {
+  const label = collapsed ? "Expand sidebar (show names)" : "Collapse sidebar";
+  return (
+    <Tooltip label={label} side="right">
+      <button onClick={onToggle} aria-label={label} aria-expanded={!collapsed}
+        className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-slate-500 hover:bg-slate-200/60 hover:text-slate-900 dark:hover:bg-slate-800 dark:hover:text-white">
+        {collapsed ? <PanelLeftOpen className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
+      </button>
+    </Tooltip>
+  );
+}
+
+/** Desktop sidebar, collapsible to an icon rail (state remembered on this device). The toggle sits at the top so it's always visible. */
 function AppSidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => void }) {
   return (
     <aside className={cn("sticky top-0 hidden h-screen shrink-0 flex-col border-r border-slate-200 bg-slate-50/80 transition-[width] duration-200 dark:border-slate-800 dark:bg-slate-950 lg:flex", collapsed ? "w-[68px]" : "w-60")}>
-      <div className={cn("flex h-14 items-center", collapsed ? "justify-center" : "px-4")}><SidebarBrand collapsed={collapsed} /></div>
-      <div className={cn("flex-1 overflow-y-auto pb-4 pt-2 scrollbar-thin", collapsed ? "px-3.5" : "px-3")}>
+      <div className={cn("flex h-14 shrink-0 items-center border-b border-slate-200/70 dark:border-slate-800/80", collapsed ? "justify-center" : "justify-between pl-4 pr-2")}>
+        {collapsed ? <SidebarToggle collapsed onToggle={onToggle} /> : <><SidebarBrand collapsed={false} /><SidebarToggle collapsed={false} onToggle={onToggle} /></>}
+      </div>
+      <div className={cn("flex-1 overflow-y-auto pb-4 pt-3 scrollbar-thin", collapsed ? "px-3.5" : "px-3")}>
         <CreateButton collapsed={collapsed} />
         <NavLinks collapsed={collapsed} />
       </div>
-      <div className={cn("space-y-3 border-t border-slate-200 p-3 dark:border-slate-800", collapsed && "flex justify-center")}>
-        {!collapsed && <GuestCard />}
-        <Tooltip label={collapsed ? "Expand sidebar" : "Collapse sidebar"} side={collapsed ? "right" : "top"}>
-          <button onClick={onToggle} className={cn("flex items-center gap-2 rounded-lg text-xs text-slate-500 hover:bg-slate-200/60 hover:text-slate-900 dark:hover:bg-slate-800 dark:hover:text-white", collapsed ? "h-9 w-9 justify-center" : "w-full px-2.5 py-1.5")}
-            aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"} aria-expanded={!collapsed}>
-            {collapsed ? <PanelLeftOpen className="h-4 w-4" /> : <><PanelLeftClose className="h-4 w-4" /> Collapse</>}
-          </button>
-        </Tooltip>
-      </div>
+      {!collapsed && <div className="border-t border-slate-200 p-3 empty:hidden dark:border-slate-800"><GuestCard /></div>}
     </aside>
   );
 }
