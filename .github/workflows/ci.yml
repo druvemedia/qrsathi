@@ -64,6 +64,15 @@ jobs:
         run: BASE_URL=http://localhost:3100 DATABASE_URL="file:$(pwd)/prisma/ci.db" npm run test:billing
       - name: Browser tests (scanner, responsive, CSP, accessibility, admin console)
         run: BASE_URL=http://localhost:3100 BROWSER=/usr/bin/google-chrome DATABASE_URL="file:$(pwd)/prisma/ci.db" npm run test:browser
+      - name: Restart server with a local SMTP mock (no mail leaves the runner)
+        run: |
+          pkill -f "next start -p 3100" || true
+          sleep 2
+          SMTP_HOST=127.0.0.1 SMTP_PORT=2525 MAIL_FROM=noreply@ci.example NODE_ENV=production DEMO_MODE=false npx next start -p 3100 > server.log 2>&1 &
+          for i in $(seq 1 60); do curl -sf http://localhost:3100/api/health && exit 0; sleep 1; done
+          cat server.log; exit 1
+      - name: Password-reset and contact e-mail tests (SMTP mock)
+        run: BASE_URL=http://localhost:3100 DATABASE_URL="file:$(pwd)/prisma/ci.db" npm run test:mail
       - name: Server log
         if: failure()
         run: cat server.log || true

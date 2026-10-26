@@ -132,12 +132,29 @@ try {
   check("CLI creates an admin", cli(["create", "--email", ADMIN], "Moderator-Pass-91x").status === 0);
   check("CLI creates a super admin", cli(["create", "--email", SUPER, "--super"], "Super-Test-Pass-82y").status === 0);
 
-  const A: Jar = {};
+  let A: Jar = {};
   const al = await call("POST", "/api/admin/auth/login", { email: ADMIN, password: "Moderator-Pass-91x" }, A);
   check("admin signs in at /api/admin/auth/login", al.status === 200 && !!A.qs_admin && !A.qs_session, al.data);
   const adminCookie = al.headers.getSetCookie().join();
   check("admin cookie is HttpOnly + SameSite=Strict, 12 h max", /HttpOnly/i.test(adminCookie) && /SameSite=Strict/i.test(adminCookie) && /Max-Age=43200/i.test(adminCookie), adminCookie);
-  check("admin (no MFA) can read stats", (await call("GET", "/api/admin/stats", undefined, A)).status === 200);
+  // Policy (remediation 2026-10-26): every administrator, not only super admins, must enrol in MFA.
+  check("admin login asks for MFA setup", al.data.mfaSetupRequired === true, al.data);
+  check("admin without MFA: admin APIs → 403", (await call("GET", "/api/admin/stats", undefined, A)).status === 403 && (await call("GET", "/api/admin/users", undefined, A)).status === 403);
+  check("admin without MFA: user mutations → 403", (await call("PATCH", "/api/admin/users/x", { status: "suspended" }, A)).status === 403);
+  const aPage = await fetch(BASE + "/admin/users", { redirect: "manual", headers: { Cookie: cookieHeader(A) } });
+  check("admin without MFA: console pages → /admin/mfa (not locked out)", aPage.status === 307 && /\/admin\/mfa$/.test(aPage.headers.get("location") || ""), aPage.headers.get("location"));
+  const aSt = await call("GET", "/api/admin/mfa", undefined, A);
+  check("admin MFA status: required, not enabled", aSt.status === 200 && aSt.data.required === true && aSt.data.enabled === false, aSt.data);
+  const aSetup = await call("POST", "/api/admin/mfa", { action: "setup" }, A);
+  const aSecret: string = aSetup.data.secret;
+  const aEn = await call("POST", "/api/admin/mfa", { action: "enable", code: totpAt(aSecret, currentStep()) }, A);
+  check("admin can enrol in MFA", aEn.status === 200 && (aEn.data.recoveryCodes || []).length === 10, aEn.data);
+  check("admin cannot disable MFA once enrolled", (await call("POST", "/api/admin/mfa", { action: "disable", code: totpAt(aSecret, currentStep() + 1), password: "Moderator-Pass-91x" }, A)).status === 403);
+  A = {};
+  const aT = await call("POST", "/api/admin/auth/login", { email: ADMIN, password: "Moderator-Pass-91x" }, A);
+  const aOk = await call("POST", "/api/admin/auth/mfa", { ticket: aT.data.ticket, code: totpAt(aSecret, currentStep() + 1) }, A);
+  check("admin signs in with password + TOTP", aT.data.mfaRequired === true && aOk.status === 200 && !!A.qs_admin, aOk.data);
+  check("admin with MFA can read stats", (await call("GET", "/api/admin/stats", undefined, A)).status === 200);
   check("admin-console cookie does not open the user workspace API", (await call("GET", "/api/products", undefined, A)).status === 401);
   const consoleHtml = await (await fetch(BASE + "/admin/users", { headers: { Cookie: cookieHeader(A) } })).text();
   check("admin console page renders without workspace navigation", /Admin console/.test(consoleHtml) && !/href="\/generator"/.test(consoleHtml) && !/href="\/inventory"/.test(consoleHtml));

@@ -2,30 +2,15 @@ const dev = process.env.NODE_ENV !== "production";
 const https = (process.env.NEXT_PUBLIC_APP_URL || "").startsWith("https://");
 
 /**
- * Content-Security-Policy. 'unsafe-inline' scripts are needed by Next's inline
- * bootstrap and the theme script; 'wasm-unsafe-eval' by the zxing barcode
- * scanner. Images allow https: because hosted pages show user-supplied image URLs.
- * Razorpay Checkout needs its script, its iframe and its telemetry endpoint.
+ * The page Content-Security-Policy is set per request by src/middleware.ts with a
+ * nonce (see src/lib/csp.ts). Responses the middleware doesn't touch (API JSON,
+ * static assets) get this restrictive fallback; uploads and brand images get the
+ * sandboxing policy below.
  */
-const csp = [
-  "default-src 'self'",
-  `script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https://checkout.razorpay.com${dev ? " 'unsafe-eval'" : ""}`,
-  "style-src 'self' 'unsafe-inline'",
-  "img-src 'self' data: blob: https:",
-  "font-src 'self' data:",
-  `connect-src 'self' https://api.razorpay.com https://lumberjack.razorpay.com${dev ? " ws: wss:" : ""}`,
-  "media-src 'self' blob:",
-  "worker-src 'self' blob:",
-  "frame-src https://api.razorpay.com https://checkout.razorpay.com",
-  "frame-ancestors 'self'",
-  "object-src 'none'",
-  "base-uri 'self'",
-  "form-action 'self'",
-].join("; ");
+const fallbackCsp = "default-src 'none'; frame-ancestors 'none'; base-uri 'none'";
 
 /** @type {import('next').NextConfig} */
 const securityHeaders = [
-  { key: "Content-Security-Policy", value: csp },
   { key: "X-Content-Type-Options", value: "nosniff" },
   { key: "X-Frame-Options", value: "SAMEORIGIN" },
   { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
@@ -45,6 +30,7 @@ const nextConfig = {
   async headers() {
     return [
       { source: "/:path*", headers: securityHeaders },
+      { source: "/api/:path*", headers: [{ key: "Content-Security-Policy", value: fallbackCsp }] },
       // User uploads and brand images: a sandboxing CSP (later rules override the global one above),
       // so even an SVG/PDF opened directly can't run script or load anything.
       ...["/f/:path*", "/brand/:path*"].map((source) => ({

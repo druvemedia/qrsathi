@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { buildCsp, newNonce } from "@/lib/csp";
 
 /**
  * CSRF defence for cookie-authenticated API calls: state-changing requests
@@ -29,12 +30,19 @@ export function allowedOrigins(req: Pick<NextRequest, "headers">, env: Record<st
 
 export function middleware(req: NextRequest) {
   const method = req.method.toUpperCase();
-  // Admin console pages: pass the requested path to the console layout so its
-  // sign-in redirect can return the administrator to the same page.
+  // Pages: a per-request CSP nonce (Next.js reads it from the request's CSP header and
+  // stamps its scripts; the root layout reads x-nonce), and the requested path so the
+  // admin console's sign-in redirect can return to the same page.
   if (!req.nextUrl.pathname.startsWith("/api/")) {
+    const nonce = newNonce();
+    const csp = buildCsp(nonce);
     const headers = new Headers(req.headers);
+    headers.set("x-nonce", nonce);
+    headers.set("content-security-policy", csp);
     headers.set("x-admin-path", req.nextUrl.pathname + req.nextUrl.search);
-    return NextResponse.next({ request: { headers } });
+    const res = NextResponse.next({ request: { headers } });
+    res.headers.set("Content-Security-Policy", csp);
+    return res;
   }
   if (["GET", "HEAD", "OPTIONS"].includes(method)) return NextResponse.next();
   if (req.nextUrl.pathname.startsWith("/api/billing/webhook")) return NextResponse.next();
@@ -51,4 +59,7 @@ export function middleware(req: NextRequest) {
   return NextResponse.next();
 }
 
-export const config = { matcher: ["/api/:path*", "/admin", "/admin/:path*"] };
+// Everything except build assets, uploads/brand files (sandboxed by next.config) and static files.
+export const config = {
+  matcher: ["/((?!_next/static|_next/image|f/|brand/|zxing/|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|wasm|txt|xml|webmanifest)$).*)"],
+};

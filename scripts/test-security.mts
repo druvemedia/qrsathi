@@ -247,7 +247,16 @@ section("Billing configuration rules (env-check)");
 t("malformed RAZORPAY_KEY_ID fails", checkEnv({ ...prodBase, RAZORPAY_KEY_ID: "abc", RAZORPAY_KEY_SECRET: "x", RAZORPAY_WEBHOOK_SECRET: "y" }).errors.some((e) => /RAZORPAY_KEY_ID/.test(e)));
 t("short SETTINGS_ENCRYPTION_KEY fails", checkEnv({ ...prodBase, SETTINGS_ENCRYPTION_KEY: "short" }).errors.length > 0);
 t("SETTINGS_ENCRYPTION_KEY equal to AUTH_SECRET fails", checkEnv({ ...prodBase, SETTINGS_ENCRYPTION_KEY: prodBase.AUTH_SECRET }).errors.length > 0);
-t("RAZORPAY_API_BASE override warns in production", checkEnv({ ...prodBase, RAZORPAY_API_BASE: "http://127.0.0.1:9" }).warnings.some((w) => /RAZORPAY_API_BASE/.test(w)));
+// Policy change (remediation 2026-10-26): the test-only override now refuses to start on a public origin.
+t("RAZORPAY_API_BASE override refuses to start on a public production origin", checkEnv({ ...prodBase, RAZORPAY_API_BASE: "http://127.0.0.1:9" }).errors.some((e) => /RAZORPAY_API_BASE/.test(e)));
+t("RAZORPAY_API_BASE override only warns for a localhost production test server", (() => { const r = checkEnv({ ...prodBase, NEXT_PUBLIC_APP_URL: "http://localhost:3100", RAZORPAY_API_BASE: "http://127.0.0.1:9" }); return !r.errors.length && r.warnings.some((w) => /RAZORPAY_API_BASE/.test(w)); })());
+t("the real Razorpay API base is accepted", checkEnv({ ...prodBase, RAZORPAY_API_BASE: "https://api.razorpay.com" }).errors.length === 0);
+t("missing SMTP refuses to start on a public production origin", checkEnv({ ...prodBase, SMTP_HOST: "" }).errors.some((e) => /SMTP/.test(e)));
+t("MAIL_DISABLED=true accepts running without e-mail (warning only)", (() => { const r = checkEnv({ ...prodBase, SMTP_HOST: "", MAIL_DISABLED: "true" }); return !r.errors.length && r.warnings.some((w) => /SMTP/.test(w)); })());
+t("SQLite refuses to start on a public production origin", checkEnv({ ...prodBase, DATABASE_URL: "file:./prod.db" }).errors.some((e) => /SQLite/.test(e)));
+t("ALLOW_SQLITE_IN_PRODUCTION=true accepts SQLite (warning only)", (() => { const r = checkEnv({ ...prodBase, DATABASE_URL: "file:./prod.db", ALLOW_SQLITE_IN_PRODUCTION: "true" }); return !r.errors.length && r.warnings.some((w) => /SQLite/.test(w)); })());
+t("unsupported database scheme (e.g. postgres://) refuses to start", checkEnv({ ...prodBase, DATABASE_URL: "postgres://u:p@h/db" }).errors.some((e) => /DATABASE_URL/.test(e)));
+t("error messages never echo secret values", (() => { const r = checkEnv({ ...prodBase, AUTH_SECRET: "short-but-secret-value", DATABASE_URL: "postgres://user:hunter2@h/db" }); return !JSON.stringify(r).includes("hunter2") && !JSON.stringify(r).includes("short-but-secret-value"); })());
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

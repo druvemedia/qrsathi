@@ -34,7 +34,8 @@
     "license:check": "node scripts/license-report.mjs",
     "test:admin": "tsx scripts/test-admin.mts",
     "audit:check": "node scripts/audit-check.mjs",
-    "test:billing": "tsx scripts/test-billing.mts"
+    "test:billing": "tsx scripts/test-billing.mts",
+    "test:mail": "tsx scripts/test-mail.mts"
   },
   "prisma": {
     "schema": "prisma/schema.prisma"
@@ -82,5 +83,8 @@
     "tailwindcss": "^3.4.19",
     "tsx": "^4.23.15",
     "typescript": "^5.9.3"
+  },
+  "overrides": {
+    "postcss": "$postcss"
   }
 }

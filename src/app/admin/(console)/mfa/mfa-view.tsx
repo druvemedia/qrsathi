@@ -87,7 +87,7 @@ export function MfaView() {
   if (!data.enabled)
     return (
       <div className="max-w-2xl space-y-6">
-        {data.required && <Alert tone="warn" title="Required for super administrators">You must enable two-factor authentication before you can use the rest of the admin console.</Alert>}
+        {data.required && <Alert tone="warn" title="Required for administrators">You must enable two-factor authentication before you can use the rest of the admin console.</Alert>}
         {!setup ? (
           <Section title="Status" actions={<Badge tone="rose">Not enabled</Badge>}>
             <p className="text-sm text-slate-600 dark:text-slate-300">Two-factor authentication is <strong>not</strong> enabled for your account. Signing in needs only your password.</p>
@@ -138,7 +138,7 @@ export function MfaView() {
           <Button variant="outline" onClick={() => { setCode(""); setRegen(true); }}>Generate new recovery codes</Button>
           {!data.required && <Button variant="outline" onClick={() => { setCode(""); setPassword(""); setDisable(true); }}>Turn off</Button>}
         </div>
-        {data.required && <p className="mt-3 text-xs text-slate-500">Super administrators can&apos;t turn off two-factor authentication.</p>}
+        {data.required && <p className="mt-3 text-xs text-slate-500">Two-factor authentication is required for administrators and can&apos;t be turned off.</p>}
       </Section>
 
       <ConfirmDialog open={regen} onClose={() => setRegen(false)} tone="primary" title="Generate new recovery codes?" confirmLabel="Generate"

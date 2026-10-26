@@ -32,6 +32,7 @@ export default async function PrivacyPage() {
       <p>We use one essential, HTTP-only cookie to keep you signed in, and short-lived cookies during Google sign-in. We do not use advertising or third-party tracking cookies.</p>
 
       <h2>6. Sharing</h2>
+      <p>If you use the contact form, the name, e-mail address, topic and message you enter are e-mailed to our support inbox through our e-mail provider so we can reply. The website itself doesn&apos;t store them; they stay in that inbox.</p>
       <p>We do not sell personal data. We share data only with service providers needed to run the service (hosting, database, email, payment processor) under confidentiality obligations, or when required by law. Abuse reports may be reviewed by our moderators.</p>
 
       <h2>7. Retention & your rights</h2>

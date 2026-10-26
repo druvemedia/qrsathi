@@ -136,13 +136,13 @@ export async function requireUser() {
 /**
  * Admin API guard (deny by default): requires an admin-console session.
  * A normal workspace session never grants admin access, even for admins.
- * Super administrators must have MFA enabled before using admin APIs
- * (except MFA enrolment itself: pass { allowWithoutMfa: true }).
+ * Every administrator (admin and super admin) must have MFA enabled before
+ * using admin APIs, except MFA enrolment itself: pass { allowWithoutMfa: true }.
  */
 export async function requireAdmin(opts: { superAdmin?: boolean; allowWithoutMfa?: boolean } = {}) {
   const a = await getAdmin();
   if (!a) throw new ApiError(401, "Administrator sign-in required.");
-  if (isSuperAdmin(a.user.role) && !a.user.mfaEnabledAt && !opts.allowWithoutMfa)
+  if (isAdminRole(a.user.role) && !a.user.mfaEnabledAt && !opts.allowWithoutMfa)
     throw new ApiError(403, "Enable two-factor authentication to use the admin console.");
   if (opts.superAdmin && !isSuperAdmin(a.user.role)) throw new ApiError(403, "Super administrator access required.");
   return a.user;

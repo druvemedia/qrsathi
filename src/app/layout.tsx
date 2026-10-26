@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import { headers } from "next/headers";
 import { Fraunces, Inter } from "next/font/google";
 import "./globals.css";
 import { Providers } from "@/components/providers";
@@ -44,14 +45,15 @@ const themeScript = (fallback: string) =>
   `(function(){try{var t=localStorage.getItem('theme')||${JSON.stringify(fallback)};var d=t==='dark'||(t!=='light'&&matchMedia('(prefers-color-scheme: dark)').matches);document.documentElement.classList.toggle('dark',d)}catch(e){}})()`;
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
-  const [settings, user] = await Promise.all([getSettings(), getUser()]);
+  const [settings, user, h] = await Promise.all([getSettings(), getUser(), headers()]);
+  const nonce = h.get("x-nonce") ?? undefined;
   const clientUser = user ? await publicUser(user) : null;
   const b = settings.branding;
   return (
     <html lang="en" suppressHydrationWarning className={`${sans.variable} ${display.variable}`}>
       <head>
         {/* Both values are validated server-side (enum / #rrggbb), so they can't inject markup. */}
-        <script dangerouslySetInnerHTML={{ __html: themeScript(b.defaultTheme) }} />
+        <script nonce={nonce} dangerouslySetInnerHTML={{ __html: themeScript(b.defaultTheme) }} />
         <style dangerouslySetInnerHTML={{ __html: themeCss(b) }} />
       </head>
       <body className="min-h-screen font-sans">

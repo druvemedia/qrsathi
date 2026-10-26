@@ -4,9 +4,10 @@
  *
  *  user         ordinary account (default for every signup)
  *  admin        platform administration: users (suspend/reactivate/sessions),
- *               moderation, plans, reports, analytics, settings
- *  super_admin  everything an admin can do + role management + account deletion;
- *               must enable MFA before using the console
+ *               moderation, reports, analytics, branding and site settings
+ *  super_admin  everything an admin can do + role management, account deletion,
+ *               plans and pricing, payment gateway and subscription changes
+ * Both admin roles must enable MFA before using the console.
  */
 export const ROLES = ["user", "admin", "super_admin"] as const;
 export type Role = (typeof ROLES)[number];

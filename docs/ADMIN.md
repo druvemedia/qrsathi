@@ -27,7 +27,8 @@ Roles are assigned **only on the server**: by the CLI below, or by a super admin
 | Admin console: overview, analytics, moderation, reports, payments, system | – | ✅ | ✅ |
 | Suspend or reactivate users, sign them out, send reset links, change plans | – | ordinary users only | everyone except self |
 | Change roles, delete accounts | – | – | ✅ (never self) |
-| Must use two-factor authentication | – | optional (recommended) | **required** |
+| Change plans and prices, payment gateway, subscriptions | – | – | ✅ |
+| Must use two-factor authentication | – | **required** | **required** |
 
 Guards:
 - The last active super administrator can't be demoted, suspended or deleted.
@@ -52,7 +53,7 @@ npm run admin -- create --email you@company.com --name "Your Name" --super
 
 - You're prompted twice for the password (hidden input). It must be at least 12 characters, contain letters and numbers, and not include your e-mail name or a common word.
 - For automation, pipe it in: `printf '%s\n' "$ADMIN_PASSWORD" | npm run admin -- create --email … --super --password-stdin`. Passwords are never accepted as command-line arguments.
-- Then open `/admin/login`. A super administrator is sent straight to **Two-factor authentication** and must enrol before using anything else.
+- Then open `/admin/login`. Every administrator is sent straight to **Two-factor authentication** and must enrol before using anything else.
 
 Other commands:
 
@@ -79,7 +80,7 @@ Every CLI action is written to the audit log with actor `cli`.
   - Set `MFA_ENCRYPTION_KEY` in production, so that rotating `AUTH_SECRET` doesn't break enrolled authenticators.
   - Changing or losing `MFA_ENCRYPTION_KEY` makes every enrolment unreadable. Administrators would then need `reset-mfa`.
 - **Codes.** 30-second steps; one step of clock drift is accepted. A code can't be reused.
-- **Turning it off** needs a current code and the password. Super administrators can't turn it off.
+- **It can't be turned off.** Two-factor authentication is required for every administrator (since 2026-10-26). An administrator without it can sign in with their password but only reaches the enrolment page until they finish. Use the lost-authenticator steps below instead of turning it off.
 
 ### Lost authenticator
 

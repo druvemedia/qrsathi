@@ -125,7 +125,7 @@ function UserDialog({ row, actor, onClose, onChanged }: { row: Row; actor: Actor
     setBusy(key);
     try {
       const r = await fn();
-      toast.success(r?.message || success || "Saved");
+      (r?.delivered === false ? toast.warning : toast.success)(r?.message || success || "Saved");
       onChanged();
       return r;
     } catch (e) {

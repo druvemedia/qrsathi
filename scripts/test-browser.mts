@@ -19,6 +19,7 @@ import { tmpdir } from "os";
 import path from "path";
 import sharp from "sharp";
 import bwipjs from "bwip-js/node";
+import { currentStep, totpAt } from "../src/lib/mfa";
 
 const BASE = (process.env.BASE_URL || "http://localhost:3000").replace(/\/$/, "");
 const browser = [
@@ -158,7 +159,16 @@ try {
     const page = await openPage(`${BASE}/scanner?camera=1`, ["--use-fake-ui-for-media-stream", "--use-fake-device-for-media-stream", `--use-file-for-fake-video-capture=${video}`], `cam-${bcid}`);
     try {
       const t = await waitForText(page, [text, kind]);
-      check(`camera → ${bcid} "${text}" shown as ${kind}`, t.includes(text) && t.includes(kind), t + (page.logs.length ? " | console: " + page.logs.join(" | ") : ""));
+      // On failure, report what was actually detected (or that the camera never started) so
+      // environment stalls can be told apart from misreads.
+      const ok = t.includes(text) && t.includes(kind);
+      let why = "";
+      if (!ok) {
+        const at = t.search(/\d+ codes? detected/);
+        const camState = /Stop camera/.test(t) ? "camera live" : /Try again|Camera unavailable|blocked/.test(t) ? "camera error" : "camera never started (still idle/starting)";
+        why = `[${camState}] ${at >= 0 ? "results: " + t.slice(at, at + 300) : "no results shown"}`;
+      }
+      check(`camera → ${bcid} "${text}" shown as ${kind}`, ok, why + (page.logs.length ? " | console: " + page.logs.join(" | ") : ""));
       if (bcid === "ean13") {
         const hist = await page.eval("localStorage.getItem('qrsathi:scans:v2') || ''");
         check("camera scan saved to on-device history", String(hist).includes(text), String(hist));
@@ -166,6 +176,13 @@ try {
     } finally {
       page.close();
     }
+  }
+
+  if (process.env.CAMERA_ONLY) {
+    // Repeat-run mode for investigating camera flakiness: stop after the camera section.
+    rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 500 });
+    console.log(`\n${pass} passed, ${fail} failed`);
+    process.exit(fail ? 1 : 0);
   }
 
   // ---------- 2. image upload with several codes ----------
@@ -278,13 +295,27 @@ try {
         for (let i = 0; i < 40; i++) {
           await new Promise((r) => setTimeout(r, 250));
           landed = String(await rpage.eval("location.pathname"));
+          if (landed === "/admin/mfa") break;
+        }
+        // Every administrator must enrol in MFA first (remediation 2026-10-26).
+        check("admin signs in through the /admin/login form and is sent to MFA enrolment", landed === "/admin/mfa", landed);
+        await waitForText(rpage, ["Set up authenticator app"], 30);
+        check("MFA enrolment page renders", String(await rpage.eval("document.body.innerText")).includes("Set up authenticator app"));
+        // Enrol through the same browser session (the API sets the new session cookie).
+        const secret = JSON.parse(String(await rpage.eval(`fetch("/api/admin/mfa", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "setup" }) }).then(r => r.json()).then(j => JSON.stringify(j.secret))`)));
+        const enabled = await rpage.eval(`fetch("/api/admin/mfa", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "enable", code: "${totpAt(secret, currentStep())}" }) }).then(r => r.status)`);
+        check("administrator enrols in MFA from the browser", enabled === 200, String(enabled));
+        await rpage.send("Page.navigate", { url: BASE + "/admin/users" });
+        for (let i = 0; i < 40; i++) {
+          await new Promise((r) => setTimeout(r, 250));
+          landed = String(await rpage.eval("location.pathname"));
           if (landed === "/admin/users") break;
         }
-        check("admin signs in through the /admin/login form and returns to ?next", landed === "/admin/users", landed);
+        check("after enrolment the console opens", landed === "/admin/users", landed);
         const pages: [string, string][] = [
           ["/admin", "Platform overview"], ["/admin/users", "All accounts"], ["/admin/qr-codes", "Dynamic & hosted codes"], ["/admin/reports", "Reports"],
           ["/admin/products", "Barcodes by format"], ["/admin/analytics", "Platform analytics"], ["/admin/subscriptions", "Accounts per plan"], ["/admin/payments", "Payment history"],
-          ["/admin/security", "Audit log"], ["/admin/settings", "Site behaviour"], ["/admin/system", "Configuration"], ["/admin/mfa", "Set up authenticator app"],
+          ["/admin/security", "Audit log"], ["/admin/settings", "Site behaviour"], ["/admin/system", "Configuration"], ["/admin/mfa", "Unused recovery codes"],
           ["/admin/barcodes", "Barcodes by format"], ["/admin/settings/branding", "Site identity"], ["/admin/settings/appearance", "Colours"], ["/admin/settings/payments", "Razorpay checkout"],
           ["/admin/settings/pricing", "Preview"], ["/admin/settings/email", "SMTP"], ["/admin/security/events", "Security events"], ["/admin/security/admins", "Administrator accounts"],
         ];

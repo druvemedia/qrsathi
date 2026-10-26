@@ -65,7 +65,7 @@ export const POST = handle<Ctx>(async (req, { params }) => {
   if (user.status !== "active") throw new ApiError(400, "Reactivate the account before sending a reset link.");
   const sent = await sendPasswordReset(user, req);
   await audit("admin.user.password_reset_sent", { actor: admin, targetType: "user", targetId: id, ip: clientIp(req), details: { delivered: sent } });
-  return json({ ok: true, message: sent ? "A password-reset link was e-mailed to the user." : "Reset link created, but e-mail isn't configured (SMTP). The user can use “Forgot password”." });
+  return json({ ok: true, delivered: sent, message: sent ? "A password-reset link was e-mailed to the user." : "Reset link created, but the e-mail couldn't be sent (SMTP isn't configured or delivery failed — see System → Application log). Nothing was delivered to the user." });
 });
 
 export const DELETE = handle<Ctx>(async (req, { params }) => {

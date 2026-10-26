@@ -29,5 +29,6 @@ export const POST = handle(async (req) => {
   await db.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } });
   await createSession(user, { kind: "admin", mfa: false });
   await audit("admin.auth.login", { actor: { id: user.id, email: user.email }, details: { mfa: false }, ip });
-  return json({ ok: true, mfaSetupRequired: user.role === "super_admin" });
+  // Every administrator must enrol before the console opens (the session only reaches /admin/mfa).
+  return json({ ok: true, mfaSetupRequired: true });
 });

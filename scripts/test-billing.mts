@@ -97,9 +97,13 @@ async function call(method: string, p: string, body?: unknown, jar?: Jar, extra:
 const cli = (args: string[], password: string) => spawnSync("npx", ["tsx", "scripts/admin.mts", ...args, "--password-stdin"], { input: password + "\n", encoding: "utf8", env: process.env, shell: process.platform === "win32" });
 const email = (t: string) => `b-${t}-${RUN}@example.com`;
 const created: string[] = [];
+let signupN = 0;
 async function signup(tag: string) {
   const jar: Jar = {};
-  const r = await call("POST", "/api/auth/signup", { name: `B ${tag}`, email: email(tag), password: "testpass123", acceptTerms: true }, jar);
+  // Each test account signs up from its own client IP: the app allows 10 sign-ups per IP per hour,
+  // and this suite creates more test customers than that.
+  const r = await call("POST", "/api/auth/signup", { name: `B ${tag}`, email: email(tag), password: "testpass123", acceptTerms: true }, jar,
+    { "X-Forwarded-For": `10.87.${Math.floor(Math.random() * 250)}.${(signupN++ % 250) + 1}` });
   created.push(email(tag));
   return { jar, id: r.data.user?.id as string, email: email(tag) };
 }
@@ -130,8 +134,15 @@ try {
   const secret = setup.data.secret;
   const en = await call("POST", "/api/admin/mfa", { action: "enable", code: totpAt(secret, currentStep()) }, S);
   check("super admin enrolled in MFA", en.status === 200, en.data);
-  const A: Jar = {};
+  // Every administrator must enrol in MFA (remediation 2026-10-26), so the ordinary admin enrols too.
+  let A: Jar = {};
   await call("POST", "/api/admin/auth/login", { email: ADMIN, password: "Billing-Staff-Pass-8w" }, A);
+  const aSecret = (await call("POST", "/api/admin/mfa", { action: "setup" }, A)).data.secret;
+  const aEn = await call("POST", "/api/admin/mfa", { action: "enable", code: totpAt(aSecret, currentStep()) }, A);
+  A = {};
+  const aTicket = (await call("POST", "/api/admin/auth/login", { email: ADMIN, password: "Billing-Staff-Pass-8w" }, A)).data.ticket;
+  const aIn = await call("POST", "/api/admin/auth/mfa", { ticket: aTicket, code: totpAt(aSecret, currentStep() + 1) }, A);
+  check("ordinary admin enrolled in MFA and signed in", aEn.status === 200 && aIn.status === 200, [aEn.data, aIn.data]);
   // Start from a clean, unconfigured gateway.
   await db.setting.deleteMany({ where: { key: { in: settingKeys.slice(0, 3) } } });
 
@@ -283,6 +294,33 @@ try {
   const fr = await call("POST", "/api/billing/verify", { razorpay_payment_id: failPay.id, razorpay_subscription_id: fs1.data.subscriptionId, razorpay_signature: sig(failPay.id, fs1.data.subscriptionId) }, F.jar);
   check("failed payment → 'failed', plan unchanged, failure recorded", fr.data.status === "failed" && (await db.user.findUnique({ where: { id: F.id } }))?.plan === "free" && (await db.payment.findUnique({ where: { providerRef: failPay.id } }))?.status === "failed", fr.data);
   check("status page explains the failure", (await call("GET", `/api/billing/status?subscription=${fs1.data.subscriptionId}`, undefined, F.jar)).data.state === "failed");
+  // Remediation 2026-10-26: events that had no coverage.
+  const failHook = { id: rid("pay"), amount: 299000, currency: "INR", status: "failed", subscription_id: fs1.data.subscriptionId, error_description: "Insufficient funds" };
+  const fw = await hook({ event: "payment.failed", payload: { payment: { entity: failHook } } });
+  check("payment.failed webhook → failure recorded, plan not granted", (await fw.text()) === "processed" && (await db.payment.findUnique({ where: { providerRef: failHook.id } }))?.status === "failed" && (await db.user.findUnique({ where: { id: F.id } }))?.plan === "free");
+
+  const C = await signup("completer");
+  const cs = await call("POST", "/api/billing/subscribe", { planId: "pro", interval: "month" }, C.jar);
+  const cSub = mock.subs.get(cs.data.subscriptionId); cSub.status = "active"; cSub.current_end = Math.floor(Date.now() / 1000) + 30 * 86400;
+  await hook(charged(cSub, { id: rid("pay"), amount: 29900, currency: "INR", status: "captured" }));
+  check("completer activated on Pro", (await db.user.findUnique({ where: { id: C.id } }))?.plan === "pro");
+  await hook({ event: "subscription.completed", payload: { subscription: { entity: { ...cSub, status: "completed" } } } });
+  const cRow = await db.user.findUnique({ where: { id: C.id } });
+  check("subscription.completed → status completed, paid access kept until the period end", (await db.subscription.findUnique({ where: { providerSubscriptionId: cs.data.subscriptionId } }))?.status === "completed" && cRow?.plan === "pro" && cRow.planExpiresAt!.getTime() > Date.now());
+  await db.user.update({ where: { id: C.id }, data: { planExpiresAt: new Date(Date.now() - 60_000) } });
+  check("once the paid period has passed, the account falls back to Free", (await call("GET", "/api/auth/me", undefined, C.jar)).data.user?.plan === "free");
+  // A verified, captured charge is honoured even after completion (the customer paid), but the status isn't revived.
+  const late = await hook(charged({ ...cSub, status: "completed" }, { id: rid("pay"), amount: 29900, currency: "INR", status: "captured" }));
+  check("a verified late charge grants the paid period without reviving the completed subscription", (await late.text()) === "processed" && (await db.subscription.findUnique({ where: { providerSubscriptionId: cs.data.subscriptionId } }))?.status === "completed" && (await call("GET", "/api/auth/me", undefined, C.jar)).data.user?.plan === "pro");
+
+  const Z = await signup("pauser");
+  const zs = await call("POST", "/api/billing/subscribe", { planId: "pro", interval: "month" }, Z.jar);
+  const zSub = mock.subs.get(zs.data.subscriptionId); zSub.status = "active"; zSub.current_end = Math.floor(Date.now() / 1000) + 30 * 86400;
+  await hook(charged(zSub, { id: rid("pay"), amount: 29900, currency: "INR", status: "captured" }));
+  await hook({ event: "subscription.paused", payload: { subscription: { entity: { ...zSub, status: "paused" } } } });
+  check("subscription.paused → paid access ends now", (await call("GET", "/api/auth/me", undefined, Z.jar)).data.user?.plan === "free");
+  await hook({ event: "subscription.resumed", payload: { subscription: { entity: { ...zSub, status: "active" } } } });
+  check("subscription.resumed alone doesn't re-grant paid access (only a verified charge does)", (await call("GET", "/api/auth/me", undefined, Z.jar)).data.user?.plan === "free");
 
   const P = await signup("pending");
   const ps = await call("POST", "/api/billing/subscribe", { planId: "pro", interval: "month" }, P.jar);

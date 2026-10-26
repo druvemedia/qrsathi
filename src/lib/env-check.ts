@@ -10,12 +10,19 @@ export function checkEnv(env: Record<string, string | undefined>) {
   const errors: string[] = [];
   const warnings: string[] = [];
   const prod = env.NODE_ENV === "production";
+  // A production server on a real (non-localhost) origin. Local production builds used by the
+  // automated test suites get warnings instead of hard failures for the test-only settings below.
+  let publicProd = false;
+  try { publicProd = prod && !LOCAL_HOSTS.has(new URL(env.NEXT_PUBLIC_APP_URL || "").hostname); } catch {}
 
   const secret = env.AUTH_SECRET || "";
   if (secret.length < 32) errors.push("AUTH_SECRET must be a random string of at least 32 characters.");
   else if (WEAK_SECRET.test(secret)) (prod ? errors : warnings).push("AUTH_SECRET looks like a placeholder. Generate a random value.");
 
   if (!env.DATABASE_URL) errors.push("DATABASE_URL is not set.");
+  else if (!/^(file:|mysql:\/\/)/.test(env.DATABASE_URL)) errors.push("DATABASE_URL must start with mysql:// (production) or file: (SQLite development). Other databases aren't supported.");
+  else if (env.DATABASE_URL.startsWith("file:") && publicProd && env.ALLOW_SQLITE_IN_PRODUCTION !== "true")
+    errors.push("Production is configured with SQLite. Use MySQL (see docs/DATABASE.md), or set ALLOW_SQLITE_IN_PRODUCTION=true to accept a single-server SQLite deployment.");
   else if (prod && env.DATABASE_URL.startsWith("file:")) warnings.push("Production is using SQLite. Use MySQL for multi-instance or high-traffic deployments (see docs/DATABASE.md).");
 
   const app = env.NEXT_PUBLIC_APP_URL || "";
@@ -42,10 +49,15 @@ export function checkEnv(env: Record<string, string | undefined>) {
     if (env.SETTINGS_ENCRYPTION_KEY.length < 32) errors.push("SETTINGS_ENCRYPTION_KEY must be at least 32 characters.");
     else if (env.SETTINGS_ENCRYPTION_KEY === env.AUTH_SECRET) errors.push("SETTINGS_ENCRYPTION_KEY must be different from AUTH_SECRET.");
   }
-  if (prod && env.RAZORPAY_API_BASE && !/^https:\/\/api\.razorpay\.com\/?$/.test(env.RAZORPAY_API_BASE)) warnings.push("RAZORPAY_API_BASE overrides the Razorpay API address. It exists for automated tests only — unset it in production.");
+  if (prod && env.RAZORPAY_API_BASE && !/^https:\/\/api\.razorpay\.com\/?$/.test(env.RAZORPAY_API_BASE))
+    (publicProd ? errors : warnings).push("RAZORPAY_API_BASE overrides the Razorpay API address. It exists for automated tests only — unset it in production.");
   if (env.RAZORPAY_KEY_ID && !env.RAZORPAY_WEBHOOK_SECRET) (prod ? errors : warnings).push("RAZORPAY_WEBHOOK_SECRET is required when Razorpay is enabled (plans are upgraded only by the signed webhook).");
   if (!!env.GOOGLE_CLIENT_ID !== !!env.GOOGLE_CLIENT_SECRET) warnings.push("Set both GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET (or neither).");
-  if (prod && !env.SMTP_HOST) warnings.push("SMTP is not configured: password-reset e-mails can't be delivered.");
+  if (prod && !env.SMTP_HOST) {
+    if (publicProd && env.MAIL_DISABLED !== "true")
+      errors.push("SMTP is not configured, so password-reset e-mails can't be delivered. Set SMTP_HOST (see .env.example), or set MAIL_DISABLED=true to run without e-mail on purpose.");
+    else warnings.push("SMTP is not configured: password-reset e-mails and the contact form are unavailable.");
+  }
 
   // Anything secret must never be exposed to the browser bundle.
   for (const k of Object.keys(env)) {
